@@ -10,10 +10,7 @@ impl Bitboard {
 
     /// Bit at index is set to one.
     pub fn set(&mut self, index: usize) {
-        println!("index: {}", index);
-        println!("self.0: {}", self.0);
         self.0 |= 1 << index;
-        println!("self.0: {}", self.0);
     }
 
     pub fn set_multiple(&mut self, bb: &Bitboard) -> Self {

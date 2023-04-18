@@ -4,7 +4,7 @@ pub mod move_sequence;
 
 pub use bitboard::Bitboard;
 pub use game::Game;
-pub use move_sequence::{Move, MoveSequence};
+pub use move_sequence::{Move, MoveSequence, MoveSequenceType};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Color {

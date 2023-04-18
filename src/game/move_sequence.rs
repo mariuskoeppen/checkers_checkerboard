@@ -50,7 +50,11 @@ impl Iterator for MoveSequence {
     type Item = Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
+        if self.0.is_empty() {
+            return None;
+        }
+        let el = self.0.remove(0);
+        Some(el)
     }
 }
 
@@ -81,6 +85,33 @@ impl MoveSequence {
 
     pub fn is_promotion(&self) -> bool {
         self.0.last().unwrap().is_promotion
+    }
+
+    pub fn move_sequence_type(&self) -> MoveSequenceType {
+        match self.is_capture() {
+            true => MoveSequenceType::Jump,
+            false => MoveSequenceType::Slide,
+        }
+    }
+
+    pub fn indeces(&self) -> Vec<usize> {
+        let mut indeces = Vec::new();
+        let mut ms = self.0.iter();
+        let first_move = ms.next().expect("there should be at least one move");
+        indeces.push(first_move.from);
+        indeces.push(first_move.to);
+        for mov in ms {
+            indeces.push(mov.to);
+        }
+        indeces
+    }
+
+    pub fn positions(&self) -> Vec<usize> {
+        let indeces = self.indeces();
+        indeces
+            .iter()
+            .map(|index| ImprovedPositionMapper::index_to_position[*index])
+            .collect()
     }
 }
 
@@ -131,4 +162,10 @@ impl ToString for MoveSequence {
 
         s
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MoveSequenceType {
+    Slide,
+    Jump,
 }

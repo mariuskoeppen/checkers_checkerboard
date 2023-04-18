@@ -53,6 +53,34 @@ impl Game {
     }
 }
 
+/// External api implementation
+impl Game {
+    pub fn make_move_external(&mut self, m: &str) -> Result<(), String> {
+        let type_of_sequence = match m.contains('x') {
+            true => MoveSequenceType::Jump,
+            false => MoveSequenceType::Slide,
+        };
+
+        let positions = match type_of_sequence {
+            MoveSequenceType::Jump => m.split('x'),
+            MoveSequenceType::Slide => m.split('-'),
+        }
+        .map(|s| s.parse::<usize>().map_err(|_| "Invalid move".to_string()))
+        .collect::<Result<Vec<usize>, String>>()?;
+
+        let available_move_sequences = self.generate_move_sequences();
+
+        for ms in available_move_sequences {
+            if ms.move_sequence_type() == type_of_sequence && ms.positions() == positions {
+                self.make_move_sequence(&ms);
+                return Ok(());
+            }
+        }
+
+        Err("No valid move sequences found".to_string())
+    }
+}
+
 /// Make move implementation
 impl Game {
     pub fn make_move_sequence(&mut self, moves_sequence: &MoveSequence) {
@@ -79,13 +107,8 @@ impl Game {
         match mov.side_to_move {
             Color::Black => {
                 // Move black mover
-                println!("Trying make move {:?}", mov);
-                println!("This is black before move {}", self.black);
                 self.black.unset(mov.from);
                 self.black.set(mov.to);
-
-                // println!("white {}", self.white);
-                println!("This is black after move {}", self.black);
 
                 // If capture, remove captured piece
                 if let Some(capture_index) = mov.capture {
@@ -190,7 +213,6 @@ impl Game {
         let mut nodes = 0;
         let move_sequences = self.generate_move_sequences();
 
-        // println!("{}: {:?}", depth, move_sequences);
         for ms in move_sequences.into_iter() {
             self.make_move_sequence(&ms);
             nodes += self.perft(depth - 1);
@@ -782,30 +804,42 @@ pub mod tests {
     #[test]
     fn perft_6() {
         let mut game = Game::new();
-        assert_eq!(game.perft(6), 36768);
+        assert_eq!(game.perft(6), 36_768);
     }
 
     #[test]
     fn perft_7() {
         let mut game = Game::new();
-        assert_eq!(game.perft(7), 179740);
+        assert_eq!(game.perft(7), 179_740);
     }
 
     #[test]
     fn perft_8() {
         let mut game = Game::new();
-        assert_eq!(game.perft(8), 845931);
+        assert_eq!(game.perft(8), 845_931);
     }
 
     #[test]
     fn perft_9() {
         let mut game = Game::new();
-        assert_eq!(game.perft(9), 3963680);
+        assert_eq!(game.perft(9), 3_963_680);
     }
 
     #[test]
     fn perft_10() {
         let mut game = Game::new();
-        assert_eq!(game.perft(10), 18391564);
+        assert_eq!(game.perft(10), 18_391_564);
+    }
+
+    #[test]
+    fn perft_11() {
+        let mut game = Game::new();
+        assert_eq!(game.perft(11), 85_242_128);
+    }
+
+    #[test]
+    fn perft_12() {
+        let mut game = Game::new();
+        assert_eq!(game.perft(12), 388_623_673);
     }
 }
