@@ -166,8 +166,7 @@ impl Iterator for Bitboard {
 
 impl Clone for Bitboard {
     fn clone(&self) -> Self {
-        Bitboard(self.0)
-        // *self
+        *self
     }
 }
 

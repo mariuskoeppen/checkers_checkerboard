@@ -761,8 +761,11 @@ impl Game {
     }
 }
 
+/// Perft tests up to depth 12
+/// 
+/// see: [https://aartbik.blogspot.com/2009/02/perft-for-checkers.html]
 #[cfg(test)]
-pub mod tests {
+pub mod perft_tests {
     use super::*;
 
     #[test]
