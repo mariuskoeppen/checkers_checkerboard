@@ -51,6 +51,24 @@ impl Game {
     pub fn not_occupied(&self) -> Bitboard {
         Bitboard::ALL & !(&self.white | &self.black)
     }
+
+    pub fn is_terminal(&mut self) -> bool {
+        // Also need to check if its a draw
+        self.white.is_empty() || self.black.is_empty() || self.generate_move_sequences().is_empty()
+    }
+
+    pub fn is_black_win(&mut self) -> bool {
+        // We might want to optimize this by not neccecarily generating all the moves
+        self.white.is_empty() || self.generate_white_move_sequences().is_empty()
+    }
+
+    pub fn is_white_win(&mut self) -> bool {
+        self.black.is_empty() || self.generate_black_move_sequences().is_empty()
+    }
+
+    pub fn is_draw(&mut self) -> bool {
+        false
+    }
 }
 
 /// External api implementation
@@ -762,7 +780,7 @@ impl Game {
 }
 
 /// Perft tests up to depth 12
-/// 
+///
 /// see: [https://aartbik.blogspot.com/2009/02/perft-for-checkers.html]
 #[cfg(test)]
 pub mod perft_tests {

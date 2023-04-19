@@ -136,6 +136,7 @@ impl PositionMapper {
 
 pub struct ImprovedPositionMapper;
 
+#[allow(non_upper_case_globals)]
 impl ImprovedPositionMapper {
     pub const position_to_index: [usize; 33] = [
         0, // There is no actual position "0"
