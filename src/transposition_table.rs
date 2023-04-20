@@ -1,4 +1,14 @@
+use std::vec;
+
 use super::game::*;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TranspositionTableFlag {
+    Exact,
+    LowerBound,
+    UpperBound,
+    Unknown,
+}
 
 #[derive(Debug, Clone)]
 pub struct TranspositionTableEntry {
@@ -6,6 +16,7 @@ pub struct TranspositionTableEntry {
     pub best_move_sequence: MoveSequence,
     pub score: i32,
     pub depth: usize,
+    pub flag: TranspositionTableFlag,
 }
 
 impl TranspositionTableEntry {
@@ -15,12 +26,14 @@ impl TranspositionTableEntry {
         best_move_sequence: MoveSequence,
         score: i32,
         depth: usize,
+        flag: TranspositionTableFlag,
     ) -> Self {
         TranspositionTableEntry::create_with_key(
             transposition_table.hash(game),
             best_move_sequence,
             score,
             depth,
+            flag,
         )
     }
 
@@ -29,12 +42,24 @@ impl TranspositionTableEntry {
         best_move_sequence: MoveSequence,
         score: i32,
         depth: usize,
+        flag: TranspositionTableFlag,
     ) -> Self {
         TranspositionTableEntry {
             key,
             best_move_sequence,
             score,
             depth,
+            flag,
+        }
+    }
+
+    pub fn create_empty_with_key(key: u64) -> Self {
+        TranspositionTableEntry {
+            key,
+            best_move_sequence: MoveSequence::new(vec![]),
+            score: 0,
+            depth: 0,
+            flag: TranspositionTableFlag::Unknown,
         }
     }
 }
@@ -100,11 +125,16 @@ impl TranspositionTable {
         // Before insertion we should check wether it's worth overwriting the entry.
         // If the entry is deeper than the one we're trying to insert, we should
         // not overwrite it.
+        if let Some(existing_entry) = &self.table[index] {
+            if existing_entry.depth > entry.depth {
+                return;
+            }
+        }
 
         self.table[index] = Some(entry);
     }
 
-    pub fn get(&self, key: u64) -> Option<&TranspositionTableEntry> {
+    pub fn fetch(&self, key: u64) -> Option<&TranspositionTableEntry> {
         let index = (key % self.table_size as u64) as usize;
 
         if let Some(entry) = &self.table[index] {
@@ -151,6 +181,6 @@ impl TranspositionTable {
 
 impl Default for TranspositionTable {
     fn default() -> Self {
-        Self::new(100_000)
+        Self::new(1_000_000)
     }
 }

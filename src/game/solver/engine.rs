@@ -1,8 +1,13 @@
-#![allow(unused)]
+// #![allow(unused)]
 
 use std::time::Duration;
 
 use super::*;
+use crate::transposition_table::{
+    TranspositionTable, TranspositionTableEntry, TranspositionTableFlag,
+};
+
+const CHECK_EVERY_N_NODES: usize = 25_000;
 
 #[derive(Debug)]
 pub struct Engine {
@@ -15,6 +20,7 @@ pub struct Engine {
     pub best_move: Option<MoveSequence>,
     pub best_score: i32,
     pub searched_nodes: usize,
+    transposition_table: TranspositionTable,
 }
 
 impl Engine {
@@ -29,6 +35,7 @@ impl Engine {
             best_move: None,
             best_score: 0,
             searched_nodes: 0,
+            transposition_table: TranspositionTable::default(),
         }
     }
 }
@@ -66,7 +73,7 @@ impl Engine {
     fn search(&mut self, depth: usize, mut alpha: i32, mut beta: i32) -> i32 {
         self.searched_nodes += 1;
 
-        if self.searched_nodes % 10_000 == 0 {
+        if self.searched_nodes % CHECK_EVERY_N_NODES == 0 {
             let end_time = std::time::Instant::now();
             let elapsed_time = end_time - self.start_time;
 
@@ -94,10 +101,49 @@ impl Engine {
             return 0;
         }
 
+        let orginal_alpha = alpha;
+        let current_hash = self.transposition_table.hash(&self.game);
+        let mut principal_variation_move = None;
+
+        if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
+            if transposition_table_entry.depth >= self.game.ply + depth {
+                match transposition_table_entry.flag {
+                    TranspositionTableFlag::Exact => {
+                        if depth == self.current_depth && !self.stopped_searching {
+                            self.best_score = transposition_table_entry.score;
+                            self.best_move =
+                                Some(transposition_table_entry.best_move_sequence.clone());
+                        }
+
+                        return transposition_table_entry.score;
+                    }
+                    TranspositionTableFlag::LowerBound => {
+                        alpha = alpha.max(transposition_table_entry.score)
+                    }
+                    TranspositionTableFlag::UpperBound => {
+                        beta = beta.min(transposition_table_entry.score)
+                    }
+                    _ => panic!("should not have unknown flag in transposition table"),
+                }
+
+                if alpha >= beta {
+                    if depth == self.current_depth && !self.stopped_searching {
+                        self.best_score = transposition_table_entry.score;
+                        self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
+                    }
+
+                    return transposition_table_entry.score;
+                }
+            } else {
+                principal_variation_move =
+                    Some(transposition_table_entry.best_move_sequence.clone());
+            }
+        }
+
         let mut best_score = -i32::MAX;
         let mut best_move = None;
         let mut available_moves = self.game.generate_move_sequences();
-        Engine::order_moves(&mut available_moves);
+        Engine::order_moves(&mut available_moves, &principal_variation_move);
 
         for m in available_moves {
             self.game.make_move_sequence(&m);
@@ -109,7 +155,9 @@ impl Engine {
             }
 
             if score >= beta {
-                return score;
+                best_score = score;
+                best_move = Some(m);
+                break;
             }
 
             if score > best_score {
@@ -122,6 +170,22 @@ impl Engine {
             }
         }
 
+        let transposition_table_entry = TranspositionTableEntry::create_with_key(
+            current_hash,
+            best_move.clone().unwrap(),
+            best_score,
+            self.game.ply + depth,
+            if best_score <= orginal_alpha {
+                TranspositionTableFlag::UpperBound
+            } else if best_score >= beta {
+                TranspositionTableFlag::LowerBound
+            } else {
+                TranspositionTableFlag::Exact
+            },
+        );
+
+        self.transposition_table.insert(transposition_table_entry);
+
         // Only update the best move if we are at the top level of the search tree.
         if depth == self.current_depth && !self.stopped_searching {
             self.best_move = best_move;
@@ -131,10 +195,10 @@ impl Engine {
         best_score
     }
 
-    fn quiescence_search(&mut self, mut alpha: i32, mut beta: i32) -> i32 {
+    fn quiescence_search(&mut self, mut alpha: i32, beta: i32) -> i32 {
         self.searched_nodes += 1;
 
-        if self.searched_nodes % 10_000 == 0 {
+        if self.searched_nodes % CHECK_EVERY_N_NODES == 0 {
             let end_time = std::time::Instant::now();
             let elapsed_time = end_time - self.start_time;
 
@@ -167,9 +231,8 @@ impl Engine {
             alpha = standing_pat;
         }
 
-        let mut best_score = -i32::MAX;
         let mut available_moves = self.game.generate_capture_move_sequences();
-        Engine::order_moves(&mut available_moves);
+        Engine::order_moves(&mut available_moves, &None);
 
         for m in available_moves {
             self.game.make_move_sequence(&m);
@@ -221,11 +284,22 @@ impl Engine {
 }
 
 impl Engine {
-    fn order_moves(moves: &mut Vec<MoveSequence>) {
-        moves.sort_by(|a, b| {
+    fn order_moves(moves: &mut Vec<MoveSequence>, principal_variation_move: &Option<MoveSequence>) {
+        moves.sort_unstable_by(|a, b| {
             let a_score = a.score();
             let b_score = b.score();
-            b_score.cmp(&a_score)
+            b_score.partial_cmp(&a_score).unwrap()
         });
+
+        // Move the principal variation move to the front of the list.
+        // Might further improve this by instead of swapping, moving the principal variation move to the front of the list and filling the gap.
+        if let Some(principal_variation_move) = principal_variation_move {
+            let index = moves
+                .iter()
+                .position(|m| m == principal_variation_move)
+                .unwrap();
+
+            moves.swap(0, index);
+        }
     }
 }

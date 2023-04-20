@@ -2,6 +2,8 @@
 
 pub mod game;
 pub mod helpers;
+pub mod transposition_table;
+
 use std::time::Duration;
 
 use crate::game::*;
@@ -9,7 +11,7 @@ use crate::game::*;
 #[tokio::main]
 async fn main() {
     let mut game = Game::new();
-    let mut engine = Engine::new(game, Color::Black, Duration::from_secs(2));
+    let mut engine = Engine::new(game, Color::Black, Duration::from_secs(1));
 
     let start_time = std::time::Instant::now();
 
