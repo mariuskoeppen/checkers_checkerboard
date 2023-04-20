@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 #[derive(Debug)]
-pub struct Bitboard(u64);
+pub struct Bitboard(pub u64);
 
 impl Bitboard {
     pub fn new() -> Self {

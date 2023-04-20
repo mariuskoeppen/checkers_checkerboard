@@ -256,6 +256,7 @@ impl Engine {
     }
 }
 
+#[allow(non_upper_case_globals)]
 impl Engine {
     /// Evaluate the current position from the perspective of the current player.
     /// White has generally speaking a positive score while black has a negative score.
@@ -264,7 +265,7 @@ impl Engine {
     ///
     /// The score is calculated as follows:
     /// - Material: 1000 The number of pieces on the board.
-    /// - Kings: 1450 The number of kings on the board.
+    /// - Kings: 1410 The number of kings on the board.
     fn evaluate(&mut self) -> i32 {
         // Score increases as white is winning, and decreases as black is winning.
         let mut score = 0;
@@ -274,13 +275,51 @@ impl Engine {
 
         // Kings
         score +=
-            450 * (self.game.white_kings.count() as i32 - self.game.black_kings.count() as i32);
+            410 * (self.game.white_kings.count() as i32 - self.game.black_kings.count() as i32);
+
+        // Men advantages
+        score += 10
+            * ((self.game.white & Engine::white_men_light).count() as i32
+                - (self.game.black & Engine::black_men_light).count() as i32);
+        score += 20
+            * ((self.game.white & Engine::white_men_mid).count() as i32
+                - (self.game.black & Engine::black_men_mid).count() as i32);
+        score += 30
+            * ((self.game.white & Engine::white_men_strong).count() as i32
+                - (self.game.black & Engine::black_men_strong).count() as i32);
+
+        // Kings advantages
+        score += 20
+            * ((self.game.white_kings & Engine::white_kings_light).count() as i32
+                - (self.game.black_kings & Engine::black_kings_light).count() as i32);
+        score += 30
+            * ((self.game.white_kings & Engine::white_kings_mid).count() as i32
+                - (self.game.black_kings & Engine::black_kings_mid).count() as i32);
+        score += 40
+            * ((self.game.white_kings & Engine::white_kings_strong).count() as i32
+                - (self.game.black_kings & Engine::black_kings_strong).count() as i32);
 
         match self.color {
             Color::White => score,
             Color::Black => -score,
         }
     }
+
+    pub const black_men_light: Bitboard = Bitboard(0xAE04285000);
+    pub const black_men_mid: Bitboard = Bitboard(0x41D3D02C00);
+    pub const black_men_strong: Bitboard = Bitboard(0x10020000000);
+
+    pub const black_kings_light: Bitboard = Bitboard(0xE8140B8000);
+    pub const black_kings_mid: Bitboard = Bitboard(0x641300000);
+    pub const black_kings_strong: Bitboard = Bitboard(0x22000000);
+
+    pub const white_men_light: Bitboard = Bitboard(0x50A103A8000);
+    pub const white_men_mid: Bitboard = Bitboard(0x1A05E5C10000);
+    pub const white_men_strong: Bitboard = Bitboard(0x2004000);
+
+    pub const white_kings_light: Bitboard = Bitboard(0xE8140B8000);
+    pub const white_kings_mid: Bitboard = Bitboard(0x641300000);
+    pub const white_kings_strong: Bitboard = Bitboard(0x22000000);
 }
 
 impl Engine {
