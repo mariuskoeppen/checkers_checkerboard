@@ -11,17 +11,44 @@ use crate::game::*;
 #[tokio::main]
 async fn main() {
     let mut game = Game::new();
-    let mut engine = Engine::new(game, Color::Black, Duration::from_secs(1));
+    let mut game = Box::new(game);
 
-    let start_time = std::time::Instant::now();
+    let mut black_engine = Engine::new(Color::Black, Duration::from_millis(1000));
+    let mut white_engine = Engine::new(Color::White, Duration::from_millis(10));
 
-    let (best_move, best_score) = engine.get_best_move().await;
+    loop {
+        let black_move = black_engine.get_best_move(&mut game).await;
+        game.make_move_sequence(&black_move.0.clone().unwrap());
+        println!("B ({}) {:?}", black_move.1, black_move.2);
 
-    let end_time = std::time::Instant::now();
-    let elapsed_time = end_time - start_time;
+        println!("{}", game.to_console_string());
 
-    println!("Elapsed time: {:?}", elapsed_time);
-    println!("Best move: {:?}, score: {}", best_move, best_score);
-    println!("Searched nodes: {}", engine.searched_nodes);
-    println!("Reached depth: {}", engine.current_depth);
+        if game.is_terminal() {
+            println!(
+                "Game over! {} won!",
+                match game.is_white_win() {
+                    true => "White",
+                    false => "Black",
+                }
+            );
+            break;
+        }
+
+        let white_move = white_engine.get_best_move(&mut game).await;
+        game.make_move_sequence(&white_move.0.clone().unwrap());
+        println!("W ({}) {:?}", white_move.1, white_move.2);
+
+        println!("{}", game.to_console_string());
+
+        if game.is_terminal() {
+            println!(
+                "Game over! {} won!",
+                match game.is_white_win() {
+                    true => "White",
+                    false => "Black",
+                }
+            );
+            break;
+        }
+    }
 }

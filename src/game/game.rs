@@ -1,6 +1,8 @@
 #![allow(unused)]
 
-use crate::game::*;
+use std::time::Duration;
+
+use crate::{game::*, helpers::ImprovedPositionMapper};
 
 #[derive(Debug)]
 pub struct Game {
@@ -54,7 +56,7 @@ impl Game {
 
     pub fn is_terminal(&mut self) -> bool {
         // Also need to check if its a draw
-        self.white.is_empty() || self.black.is_empty() || self.generate_move_sequences().is_empty()
+        self.is_white_win() || self.is_black_win() || self.is_draw()
     }
 
     pub fn is_black_win(&mut self) -> bool {
@@ -96,6 +98,84 @@ impl Game {
         }
 
         Err("No valid move sequences found".to_string())
+    }
+
+    pub fn to_console_string(&self) -> String {
+        let mut s = String::new();
+
+        s += "\n------------------------------------------------------------\n";
+
+        s += &format!("{}: ", &self.ply.to_string());
+        s += match self.side_to_move {
+            Color::White => "White moves next ",
+            Color::Black => "Black moves next ",
+        };
+        let mut e = Engine::new(self.side_to_move.clone(), Duration::from_secs(1));
+        s += &format!("<{}>", e.evaluate(&self));
+        s += "\n\n";
+
+        for row in 0..8 {
+            s += "  ";
+            s += &(8 - row).to_string();
+            s += "  |";
+            for column in 0..8 {
+                match (row % 2 == 0 && column % 2 == 0) || (row % 2 == 1 && column % 2 == 1) {
+                    true => {
+                        s += " |";
+                        continue;
+                    }
+                    false => {}
+                };
+
+                let position: usize = row * 4 + column / 2 + 1;
+                let index = ImprovedPositionMapper::position_to_index[position];
+
+                s.push_str(if self.white.get(index) {
+                    if self.white_kings.get(index) {
+                        "W"
+                    } else {
+                        "w"
+                    }
+                } else if self.black.get(index) {
+                    if self.black_kings.get(index) {
+                        "B"
+                    } else {
+                        "b"
+                    }
+                } else {
+                    " "
+                });
+
+                s += "|";
+            }
+
+            s += "\t\t|";
+            for column in 0..8 {
+                match (row % 2 == 0 && column % 2 == 0) || (row % 2 == 1 && column % 2 == 1) {
+                    true => {
+                        s += "  |";
+                        continue;
+                    }
+                    false => {}
+                };
+                let position: usize = row * 4 + column / 2 + 1;
+
+                if position < 10 {
+                    s += " ";
+                }
+                s += &position.to_string();
+                s += "|";
+            }
+
+            s += "\n";
+        }
+
+        s += "\n    a b c d e f g h";
+        s += "\t\t  a  b  c  d  e  f  g  h";
+
+        s += "\n------------------------------------------------------------\n";
+
+        s
     }
 }
 
@@ -292,7 +372,7 @@ impl Game {
             let capture = from + 5;
             let is_king_move = self.black_kings.get(from);
             let is_king_capture = self.white_kings.get(capture);
-            let is_promotion = to >= 41;
+            let is_promotion = to >= 41 && !is_king_move;
 
             let mov = Move::new(
                 Color::Black,
@@ -330,7 +410,7 @@ impl Game {
             let capture = from + 4;
             let is_king_move = self.black_kings.get(from);
             let is_king_capture = self.white_kings.get(capture);
-            let is_promotion = to >= 41;
+            let is_promotion = to >= 41 && !is_king_move;
 
             let mov = Move::new(
                 Color::Black,
@@ -463,8 +543,8 @@ impl Game {
 
         for from in left_forward.into_iter() {
             let to = from + 5;
-            let is_promotion = to >= 41;
             let is_king_move = self.black_kings.get(from);
+            let is_promotion = to >= 41 && !is_king_move;
 
             let mov = Move::new(
                 Color::Black,
@@ -481,8 +561,8 @@ impl Game {
 
         for from in right_forward.into_iter() {
             let to = from + 4;
-            let is_promotion = to >= 41;
             let is_king_move = self.black_kings.get(from);
+            let is_promotion = to >= 41 && !is_king_move;
 
             let mov = Move::new(
                 Color::Black,
@@ -548,7 +628,7 @@ impl Game {
             let capture = from - 5;
             let is_king_move = self.white_kings.get(from);
             let is_king_capture = self.black_kings.get(capture);
-            let is_promotion = to <= 13;
+            let is_promotion = to <= 13 && !is_king_move;
 
             let mov = Move::new(
                 Color::White,
@@ -586,7 +666,7 @@ impl Game {
             let capture = from - 4;
             let is_king_move = self.white_kings.get(from);
             let is_king_capture = self.black_kings.get(capture);
-            let is_promotion = to <= 13;
+            let is_promotion = to <= 13 && !is_king_move;
 
             let mov = Move::new(
                 Color::White,
@@ -719,8 +799,8 @@ impl Game {
 
         for from in left_forward.into_iter() {
             let to = from - 5;
-            let is_promotion = to <= 13;
             let is_king_move = self.white_kings.get(from);
+            let is_promotion = to <= 13 && !is_king_move;
 
             let mov = Move::new(
                 Color::White,
@@ -737,8 +817,8 @@ impl Game {
 
         for from in right_forward.into_iter() {
             let to = from - 4;
-            let is_promotion = to <= 13;
             let is_king_move = self.white_kings.get(from);
+            let is_promotion = to <= 13 && !is_king_move;
 
             let mov = Move::new(
                 Color::White,

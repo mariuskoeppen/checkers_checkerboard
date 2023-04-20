@@ -147,6 +147,24 @@ impl TranspositionTable {
 
         None
     }
+
+    pub fn get_principal_variation_line(&self, key: u64) -> Vec<MoveSequence> {
+        let mut line = vec![];
+
+        let mut current_key = key;
+
+        while let Some(entry) = self.fetch(current_key) {
+            line.push(entry.best_move_sequence.clone());
+
+            current_key = self.hash_move_sequence(
+                current_key,
+                &entry.best_move_sequence,
+                true,
+            );
+        }
+
+        line
+    }
 }
 
 /// Hashing of game states.
@@ -173,6 +191,68 @@ impl TranspositionTable {
         match game.side_to_move {
             Color::White => hash ^= self.side_hash,
             Color::Black => (),
+        }
+
+        hash
+    }
+
+    pub fn hash_move_sequence(
+        &self,
+        key: u64,
+        move_sequence: &MoveSequence,
+        is_side_switch: bool,
+    ) -> u64 {
+        let mut hash = key;
+
+        for mov in move_sequence.clone().into_iter() {
+            match mov.side_to_move {
+                Color::White => {
+                    hash ^= self.white_hashmap.0[mov.from];
+                    hash ^= self.white_hashmap.0[mov.to];
+
+                    if mov.is_king_move {
+                        hash ^= self.white_kings_hashmap.0[mov.from];
+                        hash ^= self.white_kings_hashmap.0[mov.to];
+                    }
+
+                    if let Some(capture) = mov.capture {
+                        hash ^= self.black_hashmap.0[capture];
+
+                        if mov.is_king_capture {
+                            hash ^= self.black_kings_hashmap.0[capture];
+                        }
+                    }
+
+                    if mov.is_promotion {
+                        hash ^= self.white_kings_hashmap.0[mov.to];
+                    }
+                }
+                Color::Black => {
+                    hash ^= self.black_hashmap.0[mov.from];
+                    hash ^= self.black_hashmap.0[mov.to];
+
+                    if mov.is_king_move {
+                        hash ^= self.black_kings_hashmap.0[mov.from];
+                        hash ^= self.black_kings_hashmap.0[mov.to];
+                    }
+
+                    if let Some(capture) = mov.capture {
+                        hash ^= self.white_hashmap.0[capture];
+
+                        if mov.is_king_capture {
+                            hash ^= self.white_kings_hashmap.0[capture];
+                        }
+                    }
+
+                    if mov.is_promotion {
+                        hash ^= self.black_kings_hashmap.0[mov.to];
+                    }
+                }
+            }
+        }
+
+        if is_side_switch {
+            hash ^= self.side_hash;
         }
 
         hash
