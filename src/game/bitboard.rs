@@ -34,8 +34,8 @@ impl Bitboard {
     }
 
     /// Number of ones in the bitboard.
-    pub fn count(&self) -> usize {
-        self.0.count_ones() as usize
+    pub fn count(&self) -> u32 {
+        self.0.count_ones()
     }
 
     /// Number of zeros in the bitboard.
@@ -51,6 +51,10 @@ impl Bitboard {
     /// Create Bitboard from u64.
     pub fn from_u64(value: u64) -> Self {
         Bitboard(value)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
     }
 }
 

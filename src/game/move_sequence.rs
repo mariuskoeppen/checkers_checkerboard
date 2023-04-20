@@ -113,6 +113,26 @@ impl MoveSequence {
             .map(|index| ImprovedPositionMapper::index_to_position[*index])
             .collect()
     }
+
+    pub fn score(&self) -> i32 {
+        let mut score = 0;
+
+        // King captures are better.
+        for mov in &self.0 {
+            if mov.is_king_capture {
+                score += 1;
+            }
+
+            score += 2;
+        }
+
+        // Promotions are better.
+        if self.is_promotion() {
+            score += 1;
+        }
+
+        score
+    }
 }
 
 impl ToString for MoveSequence {
