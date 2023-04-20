@@ -266,6 +266,13 @@ impl Game {
         }
     }
 
+    pub fn generate_capture_move_sequences(&mut self) -> Vec<MoveSequence> {
+        match self.side_to_move {
+            Color::Black => self.generate_black_capture_sequences(&Bitboard::ALL),
+            Color::White => self.generate_white_capture_sequences(&Bitboard::ALL),
+        }
+    }
+
     pub fn generate_black_move_sequences(&mut self) -> Vec<MoveSequence> {
         let capture_moves_sequences = self.generate_black_capture_sequences(&Bitboard::ALL);
         if capture_moves_sequences.len() > 0 {
