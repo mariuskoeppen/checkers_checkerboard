@@ -1,23 +1,31 @@
 #![allow(unused)]
 
+use std::time::Duration;
+
 use super::*;
 
 #[derive(Debug)]
 pub struct Engine {
     game: Box<Game>,
     pub color: Color,
-    pub max_depth: usize,
+    pub current_depth: usize,
+    pub max_time: Duration,
+    start_time: std::time::Instant,
+    stopped_searching: bool,
     pub best_move: Option<MoveSequence>,
     pub best_score: i32,
     pub searched_nodes: usize,
 }
 
 impl Engine {
-    pub fn new(game: Game, color: Color, max_depth: usize) -> Self {
+    pub fn new(game: Game, color: Color, max_time: Duration) -> Self {
         Engine {
             game: Box::new(game),
             color,
-            max_depth,
+            current_depth: 0,
+            max_time,
+            start_time: std::time::Instant::now(),
+            stopped_searching: false,
             best_move: None,
             best_score: 0,
             searched_nodes: 0,
@@ -31,9 +39,24 @@ impl Engine {
             panic!("Engine is not playing as the side to move.");
         }
 
+        // Iterative deepening.
+        self.start_time = std::time::Instant::now();
         self.searched_nodes = 0;
+        self.current_depth = 0;
+        self.stopped_searching = false;
 
-        self.search(self.max_depth, -i32::MAX, i32::MAX);
+        loop {
+            self.current_depth += 1;
+
+            self.search(self.current_depth, -i32::MAX, i32::MAX);
+
+            let end_time = std::time::Instant::now();
+            let elapsed_time = end_time - self.start_time;
+
+            if elapsed_time >= self.max_time || self.current_depth >= 32 || self.stopped_searching {
+                break;
+            }
+        }
 
         (self.best_move.clone(), self.best_score)
     }
@@ -42,6 +65,16 @@ impl Engine {
 impl Engine {
     fn search(&mut self, depth: usize, mut alpha: i32, mut beta: i32) -> i32 {
         self.searched_nodes += 1;
+
+        if self.searched_nodes % 10_000 == 0 {
+            let end_time = std::time::Instant::now();
+            let elapsed_time = end_time - self.start_time;
+
+            if elapsed_time >= self.max_time {
+                self.stopped_searching = true;
+                return 0;
+            }
+        }
 
         if depth == 0 {
             return self.quiescence_search(alpha, beta);
@@ -71,31 +104,45 @@ impl Engine {
             let score = -self.search(depth - 1, -beta, -alpha);
             self.game.unmake_move_sequence();
 
+            if self.stopped_searching {
+                return 0;
+            }
+
+            if score >= beta {
+                return score;
+            }
+
             if score > best_score {
                 best_score = score;
                 best_move = Some(m);
-            }
 
-            if score > alpha {
-                alpha = score;
-            }
-
-            if alpha >= beta {
-                break;
+                if score > alpha {
+                    alpha = score;
+                }
             }
         }
 
         // Only update the best move if we are at the top level of the search tree.
-        if depth == self.max_depth {
+        if depth == self.current_depth && !self.stopped_searching {
             self.best_move = best_move;
             self.best_score = best_score;
         }
-        
+
         best_score
     }
 
     fn quiescence_search(&mut self, mut alpha: i32, mut beta: i32) -> i32 {
         self.searched_nodes += 1;
+
+        if self.searched_nodes % 10_000 == 0 {
+            let end_time = std::time::Instant::now();
+            let elapsed_time = end_time - self.start_time;
+
+            if elapsed_time >= self.max_time {
+                self.stopped_searching = true;
+                return 0;
+            }
+        }
 
         if self.game.is_black_win() {
             match self.color {
@@ -128,6 +175,10 @@ impl Engine {
             self.game.make_move_sequence(&m);
             let score = -self.quiescence_search(-beta, -alpha);
             self.game.unmake_move_sequence();
+
+            if self.stopped_searching {
+                return 0;
+            }
 
             if score >= beta {
                 return beta;
