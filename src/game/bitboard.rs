@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 #[derive(Debug)]
+#[derive(Default)]
 pub struct Bitboard(pub u64);
 
 impl Bitboard {
@@ -116,11 +117,7 @@ impl Bitboard {}
 
 // region: std Bitboard implentations
 
-impl Default for Bitboard {
-    fn default() -> Self {
-        Bitboard(0)
-    }
-}
+
 
 impl AsMut<u64> for Bitboard {
     fn as_mut(&mut self) -> &mut u64 {
@@ -224,38 +221,6 @@ impl std::ops::BitXor for &Bitboard {
     }
 }
 
-impl std::ops::Sub for Bitboard {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Bitboard(self.0 & !rhs.0)
-    }
-}
-
-impl std::ops::Sub for &Bitboard {
-    type Output = Bitboard;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Bitboard(self.0 & !rhs.0)
-    }
-}
-
-impl std::ops::Add for Bitboard {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Bitboard(self.0 | rhs.0)
-    }
-}
-
-impl std::ops::Add for &Bitboard {
-    type Output = Bitboard;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Bitboard(self.0 | rhs.0)
-    }
-}
-
 impl std::ops::Shl<usize> for Bitboard {
     type Output = Self;
 
@@ -321,30 +286,6 @@ impl std::ops::BitXorAssign for Bitboard {
 impl std::ops::BitXorAssign for &mut Bitboard {
     fn bitxor_assign(&mut self, rhs: Self) {
         self.0 ^= rhs.0;
-    }
-}
-
-impl std::ops::SubAssign for Bitboard {
-    fn sub_assign(&mut self, rhs: Self) {
-        self.0 &= !rhs.0;
-    }
-}
-
-impl std::ops::SubAssign for &mut Bitboard {
-    fn sub_assign(&mut self, rhs: Self) {
-        self.0 &= !rhs.0;
-    }
-}
-
-impl std::ops::AddAssign for Bitboard {
-    fn add_assign(&mut self, rhs: Self) {
-        self.0 |= rhs.0;
-    }
-}
-
-impl std::ops::AddAssign for &mut Bitboard {
-    fn add_assign(&mut self, rhs: Self) {
-        self.0 |= rhs.0;
     }
 }
 

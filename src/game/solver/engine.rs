@@ -67,7 +67,7 @@ impl Engine {
 
         let principal_variation_line = self
             .transposition_table
-            .get_principal_variation_line(self.transposition_table.hash(&game))
+            .get_principal_variation_line(self.transposition_table.hash(game))
             .iter()
             .map(|x| x.to_string())
             .collect::<Vec<String>>()
@@ -116,7 +116,7 @@ impl Engine {
         }
 
         let orginal_alpha = alpha;
-        let current_hash = self.transposition_table.hash(&game);
+        let current_hash = self.transposition_table.hash(game);
         let mut principal_variation_move = None;
 
         if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
@@ -350,7 +350,7 @@ impl Engine {
     /// - captures
     /// - king captures
     /// - promotions
-    fn order_moves(moves: &mut Vec<MoveSequence>, principal_variation_move: &Option<MoveSequence>) {
+    fn order_moves(moves: &mut [MoveSequence], principal_variation_move: &Option<MoveSequence>) {
         moves.sort_unstable_by(|a, b| {
             let a_score = a.score();
             let b_score = b.score();

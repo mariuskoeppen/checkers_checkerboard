@@ -180,19 +180,19 @@ impl TranspositionTable {
     pub fn hash(&self, game: &Game) -> u64 {
         let mut hash = 0;
 
-        for index in game.white.clone().into_iter() {
+        for index in game.white.into_iter() {
             hash ^= self.white_hashmap.0[index];
         }
 
-        for index in game.black.clone().into_iter() {
+        for index in game.black.into_iter() {
             hash ^= self.black_hashmap.0[index];
         }
 
-        for index in game.white_kings.clone().into_iter() {
+        for index in game.white_kings.into_iter() {
             hash ^= self.white_kings_hashmap.0[index];
         }
 
-        for index in game.black_kings.clone().into_iter() {
+        for index in game.black_kings.into_iter() {
             hash ^= self.black_kings_hashmap.0[index];
         }
 
@@ -217,7 +217,7 @@ impl TranspositionTable {
     ) -> u64 {
         let mut hash = key;
 
-        for mov in move_sequence.clone().into_iter() {
+        for mov in move_sequence.clone() {
             match mov.side_to_move {
                 Color::White => {
                     hash ^= self.white_hashmap.0[mov.from];

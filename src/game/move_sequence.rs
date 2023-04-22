@@ -168,7 +168,7 @@ impl ToString for MoveSequence {
                 .as_str(),
         );
 
-        while let Some(mov) = moves.next() {
+        for mov in moves {
             s.push_str(match mov.capture {
                 Some(_) => match mov.is_king_capture {
                     true => "X",
@@ -185,7 +185,7 @@ impl ToString for MoveSequence {
         }
 
         if self.is_promotion() {
-            s.push_str("#");
+            s.push('#');
         }
 
         s

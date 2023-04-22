@@ -135,7 +135,7 @@ impl Game {
             Color::Black => "Black moves next ",
         };
         let mut e = Engine::new(self.side_to_move.clone(), Duration::from_secs(1));
-        s += &format!("<{}>", e.evaluate(&self));
+        s += &format!("<{}>", e.evaluate(self));
         s += "\n\n";
 
         for row in 0..8 {
@@ -206,7 +206,7 @@ impl Game {
 /// Make move implementation
 impl Game {
     pub fn make_move_sequence(&mut self, moves_sequence: &MoveSequence) {
-        for mov in moves_sequence.clone().into_iter() {
+        for mov in moves_sequence.clone() {
             self.make_move(&mov);
         }
 
@@ -328,7 +328,7 @@ impl Game {
 impl Game {
     /// Perft (performance test) is a function that counts the number of legal moves
     pub fn perft(&mut self, depth: usize) -> usize {
-        if depth <= 0 {
+        if depth == 0 {
             return 1;
         }
 
@@ -379,7 +379,7 @@ impl Game {
 
     pub fn generate_black_move_sequences(&mut self) -> Vec<MoveSequence> {
         let capture_moves_sequences = self.generate_black_capture_sequences(&Bitboard::ALL);
-        if capture_moves_sequences.len() > 0 {
+        if !capture_moves_sequences.is_empty() {
             return capture_moves_sequences;
         }
 
@@ -419,11 +419,11 @@ impl Game {
             self.make_move(&mov);
             let sub_sequences =
                 self.generate_black_capture_sequences(&Bitboard::create_one_hot(to));
-            if sub_sequences.len() == 0 {
+            if sub_sequences.is_empty() {
                 move_sequences.push(move_sequence);
             } else {
                 sub_sequences.into_iter().for_each(|mut seq: MoveSequence| {
-                    move_sequences.push(move_sequence.extended(&mut seq));
+                    move_sequences.push(move_sequence.extended(&seq));
                 });
             }
             self.unmake_move(&mov);
@@ -457,11 +457,11 @@ impl Game {
             self.make_move(&mov);
             let sub_sequences =
                 self.generate_black_capture_sequences(&Bitboard::create_one_hot(to));
-            if sub_sequences.len() == 0 {
+            if sub_sequences.is_empty() {
                 move_sequences.push(move_sequence);
             } else {
                 sub_sequences.into_iter().for_each(|mut seq: MoveSequence| {
-                    move_sequences.push(move_sequence.extended(&mut seq));
+                    move_sequences.push(move_sequence.extended(&seq));
                 });
             }
             self.unmake_move(&mov);
@@ -493,11 +493,11 @@ impl Game {
             self.make_move(&mov);
             let sub_sequences =
                 self.generate_black_capture_sequences(&Bitboard::create_one_hot(to));
-            if sub_sequences.len() == 0 {
+            if sub_sequences.is_empty() {
                 move_sequences.push(move_sequence);
             } else {
                 sub_sequences.into_iter().for_each(|mut seq: MoveSequence| {
-                    move_sequences.push(move_sequence.extended(&mut seq));
+                    move_sequences.push(move_sequence.extended(&seq));
                 });
             }
             self.unmake_move(&mov);
@@ -529,11 +529,11 @@ impl Game {
             self.make_move(&mov);
             let sub_sequences =
                 self.generate_black_capture_sequences(&Bitboard::create_one_hot(to));
-            if sub_sequences.len() == 0 {
+            if sub_sequences.is_empty() {
                 move_sequences.push(move_sequence);
             } else {
                 sub_sequences.into_iter().for_each(|mut seq: MoveSequence| {
-                    move_sequences.push(move_sequence.extended(&mut seq));
+                    move_sequences.push(move_sequence.extended(&seq));
                 });
             }
             self.unmake_move(&mov);
@@ -635,7 +635,7 @@ impl Game {
 
     pub fn generate_white_move_sequences(&mut self) -> Vec<MoveSequence> {
         let capture_moves_sequences = self.generate_white_capture_sequences(&Bitboard::ALL);
-        if capture_moves_sequences.len() > 0 {
+        if !capture_moves_sequences.is_empty() {
             return capture_moves_sequences;
         }
 
@@ -675,11 +675,11 @@ impl Game {
             self.make_move(&mov);
             let sub_sequences =
                 self.generate_white_capture_sequences(&Bitboard::create_one_hot(to));
-            if sub_sequences.len() == 0 {
+            if sub_sequences.is_empty() {
                 move_sequences.push(move_sequence);
             } else {
                 sub_sequences.into_iter().for_each(|mut seq: MoveSequence| {
-                    move_sequences.push(move_sequence.extended(&mut seq));
+                    move_sequences.push(move_sequence.extended(&seq));
                 });
             }
             self.unmake_move(&mov);
@@ -713,11 +713,11 @@ impl Game {
             self.make_move(&mov);
             let sub_sequences =
                 self.generate_white_capture_sequences(&Bitboard::create_one_hot(to));
-            if sub_sequences.len() == 0 {
+            if sub_sequences.is_empty() {
                 move_sequences.push(move_sequence);
             } else {
                 sub_sequences.into_iter().for_each(|mut seq: MoveSequence| {
-                    move_sequences.push(move_sequence.extended(&mut seq));
+                    move_sequences.push(move_sequence.extended(&seq));
                 });
             }
             self.unmake_move(&mov);
@@ -749,11 +749,11 @@ impl Game {
             self.make_move(&mov);
             let sub_sequences =
                 self.generate_white_capture_sequences(&Bitboard::create_one_hot(to));
-            if sub_sequences.len() == 0 {
+            if sub_sequences.is_empty() {
                 move_sequences.push(move_sequence);
             } else {
                 sub_sequences.into_iter().for_each(|mut seq: MoveSequence| {
-                    move_sequences.push(move_sequence.extended(&mut seq));
+                    move_sequences.push(move_sequence.extended(&seq));
                 });
             }
             self.unmake_move(&mov);
@@ -785,11 +785,11 @@ impl Game {
             self.make_move(&mov);
             let sub_sequences =
                 self.generate_white_capture_sequences(&Bitboard::create_one_hot(to));
-            if sub_sequences.len() == 0 {
+            if sub_sequences.is_empty() {
                 move_sequences.push(move_sequence);
             } else {
                 sub_sequences.into_iter().for_each(|mut seq: MoveSequence| {
-                    move_sequences.push(move_sequence.extended(&mut seq));
+                    move_sequences.push(move_sequence.extended(&seq));
                 });
             }
             self.unmake_move(&mov);
