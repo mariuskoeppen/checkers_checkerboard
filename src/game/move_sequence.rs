@@ -1,5 +1,5 @@
 use crate::game::Color;
-use crate::helpers::ImprovedPositionMapper;
+use crate::helpers::PositionMapper;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Move {
@@ -114,7 +114,7 @@ impl MoveSequence {
         let indeces = self.indeces();
         indeces
             .iter()
-            .map(|index| ImprovedPositionMapper::index_to_position[*index])
+            .map(|index| PositionMapper::index_to_position[*index])
             .collect()
     }
 
@@ -149,7 +149,7 @@ impl ToString for MoveSequence {
         let mut moves = self.0.iter();
         let first_move = moves.next().expect("there should be at least one move");
         s.push_str(
-            ImprovedPositionMapper::index_to_position[first_move.from]
+            PositionMapper::index_to_position[first_move.from]
                 .to_string()
                 .as_str(),
         );
@@ -163,7 +163,7 @@ impl ToString for MoveSequence {
         });
 
         s.push_str(
-            ImprovedPositionMapper::index_to_position[first_move.to]
+            PositionMapper::index_to_position[first_move.to]
                 .to_string()
                 .as_str(),
         );
@@ -178,7 +178,7 @@ impl ToString for MoveSequence {
             });
 
             s.push_str(
-                ImprovedPositionMapper::index_to_position[mov.to]
+                PositionMapper::index_to_position[mov.to]
                     .to_string()
                     .as_str(),
             );

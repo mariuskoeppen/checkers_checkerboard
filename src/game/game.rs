@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use crate::{game::*, helpers::ImprovedPositionMapper};
+use crate::{game::*, helpers::PositionMapper};
 
 #[derive(Debug)]
 pub struct Game {
@@ -51,7 +51,7 @@ impl Game {
     }
 
     pub fn not_occupied(&self) -> Bitboard {
-        Bitboard::ALL & !(&self.white | &self.black)
+        Bitboard::ALL & !(self.white | self.black)
     }
 
     pub fn is_terminal(&mut self) -> bool {
@@ -152,7 +152,7 @@ impl Game {
                 };
 
                 let position: usize = row * 4 + column / 2 + 1;
-                let index = ImprovedPositionMapper::position_to_index[position];
+                let index = PositionMapper::position_to_index[position];
 
                 s.push_str(if self.white.get(index) {
                     if self.white_kings.get(index) {
