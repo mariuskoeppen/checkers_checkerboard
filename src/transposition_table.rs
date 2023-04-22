@@ -97,6 +97,7 @@ pub struct TranspositionTable {
     white_kings_hashmap: TranspositionTableHashMap,
     black_kings_hashmap: TranspositionTableHashMap,
     side_hash: u64,
+    draw_hash: u64,
 }
 
 impl TranspositionTable {
@@ -104,6 +105,7 @@ impl TranspositionTable {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         let side_hash = rng.gen();
+        let draw_hash = rng.gen();
 
         TranspositionTable {
             table_size,
@@ -113,6 +115,7 @@ impl TranspositionTable {
             white_kings_hashmap: TranspositionTableHashMap::default(),
             black_kings_hashmap: TranspositionTableHashMap::default(),
             side_hash,
+            draw_hash,
         }
     }
 }
@@ -163,7 +166,7 @@ impl TranspositionTable {
 
             line.push(entry.clone());
 
-            current_key = self.hash_move_sequence(current_key, &entry.best_move_sequence, true);
+            current_key = self.hash_move_sequence(current_key, &entry.best_move_sequence, true, false);
         }
 
         line.iter()
@@ -198,6 +201,10 @@ impl TranspositionTable {
             Color::Black => (),
         }
 
+        if game.is_draw() {
+            hash ^= self.draw_hash;
+        }
+
         hash
     }
 
@@ -206,6 +213,7 @@ impl TranspositionTable {
         key: u64,
         move_sequence: &MoveSequence,
         is_side_switch: bool,
+        results_in_draw: bool,
     ) -> u64 {
         let mut hash = key;
 
@@ -258,6 +266,10 @@ impl TranspositionTable {
 
         if is_side_switch {
             hash ^= self.side_hash;
+        }
+
+        if results_in_draw {
+            hash ^= self.draw_hash;
         }
 
         hash

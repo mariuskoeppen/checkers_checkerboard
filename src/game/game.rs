@@ -68,8 +68,32 @@ impl Game {
         self.black.is_empty() || self.generate_black_move_sequences().is_empty()
     }
 
-    pub fn is_draw(&mut self) -> bool {
-        false
+    pub fn is_draw(&self) -> bool {
+        return false;
+        unreachable!();
+        // 1. The game is a draw if the same position occurs three times.
+        if self.ply < 6 {
+            return false;
+        }
+
+        let last_move = self.move_history.last().expect("No moves made yet");
+        let occured_three_times = self.move_history.iter().filter(|m| m == &last_move).count() >= 3;
+        if occured_three_times {
+            return true;
+        }
+
+        // 2. The game is a draw if for 50 plies no irreversible move is played
+        // e.g. no piece is captured and no pawn is moved.
+        if self.ply < 50 {
+            return false;
+        }
+
+        !self
+            .move_history
+            .iter()
+            .rev()
+            .take(50)
+            .any(|ms| ms.is_irreversible())
     }
 }
 

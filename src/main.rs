@@ -23,14 +23,14 @@ async fn main() {
 
         println!("{}", game.to_console_string());
 
-        if game.is_terminal() {
-            println!(
-                "Game over! {} won!",
-                match game.is_white_win() {
-                    true => "White",
-                    false => "Black",
-                }
-            );
+        if game.is_draw() {
+            println!("Game over! Draw!");
+            break;
+        } else if game.is_terminal() {
+            println!("Game over! {} won!", match game.is_white_win() {
+                true => "White",
+                false => "Black",
+            });
             break;
         }
 
@@ -40,14 +40,14 @@ async fn main() {
 
         println!("{}", game.to_console_string());
 
-        if game.is_terminal() {
-            println!(
-                "Game over! {} won!",
-                match game.is_white_win() {
-                    true => "White",
-                    false => "Black",
-                }
-            );
+        if game.is_draw() {
+            println!("Game over! Draw!");
+            break;
+        } else if game.is_terminal() {
+            println!("Game over! {} won!", match game.is_white_win() {
+                true => "White",
+                false => "Black",
+            });
             break;
         }
     }

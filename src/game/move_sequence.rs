@@ -87,6 +87,10 @@ impl MoveSequence {
         self.0.last().unwrap().is_promotion
     }
 
+    pub fn is_king_move(&self) -> bool {
+        self.0[0].is_king_move
+    }
+
     pub fn move_sequence_type(&self) -> MoveSequenceType {
         match self.is_capture() {
             true => MoveSequenceType::Jump,
@@ -132,6 +136,10 @@ impl MoveSequence {
         }
 
         score
+    }
+
+    pub fn is_irreversible(&self) -> bool {
+        !self.is_king_move() || self.is_capture()
     }
 }
 
