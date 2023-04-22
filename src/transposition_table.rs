@@ -154,16 +154,21 @@ impl TranspositionTable {
         let mut current_key = key;
 
         while let Some(entry) = self.fetch(current_key) {
-            line.push(entry.best_move_sequence.clone());
+            if line
+                .iter()
+                .any(|line_entry: &TranspositionTableEntry| line_entry.key == entry.key)
+            {
+                break;
+            }
 
-            current_key = self.hash_move_sequence(
-                current_key,
-                &entry.best_move_sequence,
-                true,
-            );
+            line.push(entry.clone());
+
+            current_key = self.hash_move_sequence(current_key, &entry.best_move_sequence, true);
         }
 
-        line
+        line.iter()
+            .map(|entry| entry.best_move_sequence.clone())
+            .collect()
     }
 }
 

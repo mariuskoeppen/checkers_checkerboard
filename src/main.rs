@@ -14,7 +14,7 @@ async fn main() {
     let mut game = Box::new(game);
 
     let mut black_engine = Engine::new(Color::Black, Duration::from_millis(1000));
-    let mut white_engine = Engine::new(Color::White, Duration::from_millis(10));
+    let mut white_engine = Engine::new(Color::White, Duration::from_millis(100));
 
     loop {
         let black_move = black_engine.get_best_move(&mut game).await;

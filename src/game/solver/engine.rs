@@ -96,8 +96,7 @@ impl Engine {
         }
 
         if depth == 0 {
-            // return self.quiescence_search(game, alpha, beta);
-            return self.evaluate(game);
+            return self.quiescence_search(game, alpha, beta);
         }
 
         if game.is_black_win() {
@@ -280,7 +279,7 @@ impl Engine {
     }
 }
 
-#[allow(non_upper_case_globals)]
+/// Evaluation.
 impl Engine {
     /// Evaluate the current position from the perspective of the current player.
     /// White has generally speaking a positive score while black has a negative score.
@@ -322,14 +321,11 @@ impl Engine {
             * ((game.white_kings & Engine::white_kings_strong).count() as i32
                 - (game.black_kings & Engine::black_kings_strong).count() as i32);
 
-        // match self.color {
-        //     Color::White => score,
-        //     Color::Black => -score,
-        // }
-
         score
     }
-
+}
+#[allow(non_upper_case_globals)]
+impl Engine {
     pub const black_men_light: Bitboard = Bitboard(0xAE04285000);
     pub const black_men_mid: Bitboard = Bitboard(0x41D3D02C00);
     pub const black_men_strong: Bitboard = Bitboard(0x10020000000);
@@ -348,6 +344,12 @@ impl Engine {
 }
 
 impl Engine {
+    /// Order moves to get better alpha beta pruning.
+    /// The principal variation move is moved to the front of the list.
+    /// The rest of the moves are sorted by score, which factors in
+    /// - captures
+    /// - king captures
+    /// - promotions
     fn order_moves(moves: &mut Vec<MoveSequence>, principal_variation_move: &Option<MoveSequence>) {
         moves.sort_unstable_by(|a, b| {
             let a_score = a.score();
@@ -357,13 +359,13 @@ impl Engine {
 
         // // Move the principal variation move to the front of the list.
         // // Might further improve this by instead of swapping, moving the principal variation move to the front of the list and filling the gap.
-        // if let Some(principal_variation_move) = principal_variation_move {
-        //     let index = moves
-        //         .iter()
-        //         .position(|m| m == principal_variation_move)
-        //         .unwrap();
+        if let Some(principal_variation_move) = principal_variation_move {
+            let index = moves
+                .iter()
+                .position(|m| m == principal_variation_move)
+                .unwrap();
 
-        //     moves.swap(0, index);
-        // }
+            moves.swap(0, index);
+        }
     }
 }
