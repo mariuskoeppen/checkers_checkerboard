@@ -68,7 +68,7 @@ impl TranspositionTableEntry {
 struct TranspositionTableHashMap([u64; 64]);
 
 impl TranspositionTableHashMap {
-    fn new() -> Self {
+    pub fn new() -> Self {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         let mut array = [0; 64];
@@ -78,6 +78,19 @@ impl TranspositionTableHashMap {
         }
 
         TranspositionTableHashMap(array)
+    }
+
+    pub fn check_type_1_errors(&self) -> bool {
+        let mut set = std::collections::HashSet::new();
+
+        for i in 0..64 {
+            if set.contains(&self.0[i]) {
+                return true;
+            }
+            set.insert(self.0[i]);
+        }
+
+        false
     }
 }
 
@@ -97,7 +110,7 @@ pub struct TranspositionTable {
     white_kings_hashmap: TranspositionTableHashMap,
     black_kings_hashmap: TranspositionTableHashMap,
     side_hash: u64,
-    draw_hash: u64,
+    // draw_hash: u64,
 }
 
 impl TranspositionTable {
@@ -105,17 +118,39 @@ impl TranspositionTable {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         let side_hash = rng.gen();
-        let draw_hash = rng.gen();
+        // let draw_hash = rng.gen();
+
+        let mut white_hashmap = TranspositionTableHashMap::default();
+        let mut black_hashmap = TranspositionTableHashMap::default();
+        let mut white_kings_hashmap = TranspositionTableHashMap::default();
+        let mut black_kings_hashmap = TranspositionTableHashMap::default();
+
+        // We should check for type 1 errors in the hashmaps.
+        // Type 1 errors are when two different indices in the hashmap have the same value.
+        // This is a problem because it means that the hash function is not injective.
+        // This means that the hash function is not one-to-one, which means that it's not
+        // possible to get the original value from the hash.
+        while white_hashmap.check_type_1_errors() {
+            white_hashmap = TranspositionTableHashMap::default();
+        }
+        while black_hashmap.check_type_1_errors() {
+            black_hashmap = TranspositionTableHashMap::default();
+        }
+        while white_kings_hashmap.check_type_1_errors() {
+            white_kings_hashmap = TranspositionTableHashMap::default();
+        }
+        while black_kings_hashmap.check_type_1_errors() {
+            black_kings_hashmap = TranspositionTableHashMap::default();
+        }
 
         TranspositionTable {
             table_size,
             table: vec![None; table_size],
-            white_hashmap: TranspositionTableHashMap::default(),
-            black_hashmap: TranspositionTableHashMap::default(),
-            white_kings_hashmap: TranspositionTableHashMap::default(),
-            black_kings_hashmap: TranspositionTableHashMap::default(),
+            white_hashmap,
+            black_hashmap,
+            white_kings_hashmap,
+            black_kings_hashmap,
             side_hash,
-            draw_hash,
         }
     }
 }
@@ -123,16 +158,16 @@ impl TranspositionTable {
 /// Insertion and retrieval of entries in the transposition table.
 impl TranspositionTable {
     pub fn insert(&mut self, entry: TranspositionTableEntry) {
-        let index = (entry.key % self.table_size as u64) as usize;
-
         // Before insertion we should check wether it's worth overwriting the entry.
         // If the entry is deeper than the one we're trying to insert, we should
         // not overwrite it.
-        if let Some(existing_entry) = &self.table[index] {
+        if let Some(existing_entry) = self.fetch(entry.key) {
             if existing_entry.depth > entry.depth {
                 return;
             }
         }
+
+        let index = (entry.key % self.table_size as u64) as usize;
 
         self.table[index] = Some(entry);
     }
@@ -166,7 +201,7 @@ impl TranspositionTable {
 
             line.push(entry.clone());
 
-            current_key = self.hash_move_sequence(current_key, &entry.best_move_sequence, true, false);
+            current_key = self.hash_move_sequence(current_key, &entry.best_move_sequence, true);
         }
 
         line.iter()
@@ -201,10 +236,6 @@ impl TranspositionTable {
             Color::Black => (),
         }
 
-        if game.is_draw() {
-            hash ^= self.draw_hash;
-        }
-
         hash
     }
 
@@ -213,7 +244,6 @@ impl TranspositionTable {
         key: u64,
         move_sequence: &MoveSequence,
         is_side_switch: bool,
-        results_in_draw: bool,
     ) -> u64 {
         let mut hash = key;
 
@@ -268,16 +298,14 @@ impl TranspositionTable {
             hash ^= self.side_hash;
         }
 
-        if results_in_draw {
-            hash ^= self.draw_hash;
-        }
-
         hash
     }
 }
 
 impl Default for TranspositionTable {
     fn default() -> Self {
-        Self::new(1_000_000)
+        // 2^20 + 7 to make it a prime number
+        // Will result in a table size of 2^20 * 48 bytes = 50.3 MB
+        Self::new(1_048_583)
     }
 }

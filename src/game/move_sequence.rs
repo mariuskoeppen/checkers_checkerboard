@@ -43,6 +43,17 @@ impl Move {
     }
 }
 
+// impl PartialEq for Move {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.side_to_move == other.side_to_move
+//             && self.from == other.from
+//             && self.to == other.to
+//             && self.is_king_move == other.is_king_move
+//             && self.is_king_capture == other.is_king_capture
+//             && self.is_promotion == other.is_promotion
+//     }
+// }
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MoveSequence(Vec<Move>);
 
