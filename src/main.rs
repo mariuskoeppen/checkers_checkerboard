@@ -14,13 +14,13 @@ async fn main() {
     let mut game = Box::new(game);
 
     let mut black_engine = Engine::new(Color::Black, Duration::from_millis(500));
-    let mut white_engine = Engine::new(Color::White, Duration::from_millis(500));
+    let mut white_engine = Engine::new(Color::White, Duration::from_millis(100));
 
     let (best_move, score, pv) = black_engine.find_best_move(&mut game).await;
     println!("Best move: {:?} <{}> {} ", best_move, score, pv);
 
     // loop {
-    //     let black_move = black_engine.get_best_move(&mut game).await;
+    //     let black_move = black_engine.find_best_move(&mut game).await;
     //     game.make_move_sequence(&black_move.0.clone().unwrap());
     //     println!("B ({}) {:?}", black_move.1, black_move.2);
 
@@ -40,7 +40,7 @@ async fn main() {
     //         break;
     //     }
 
-    //     let white_move = white_engine.get_best_move(&mut game).await;
+    //     let white_move = white_engine.find_best_move(&mut game).await;
     //     game.make_move_sequence(&white_move.0.clone().unwrap());
     //     println!("W ({}) {:?}", white_move.1, white_move.2);
 

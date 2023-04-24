@@ -17,7 +17,7 @@ pub struct Engine {
     start_time: std::time::Instant,
     stopped_searching: bool,
     pub best_move: Option<MoveSequence>,
-    pub best_score: i32,
+    pub best_score: Score,
     pub searched_nodes: usize,
     transposition_table: TranspositionTable,
 }
@@ -31,7 +31,7 @@ impl Engine {
             start_time: std::time::Instant::now(),
             stopped_searching: false,
             best_move: None,
-            best_score: 0,
+            best_score: Score::Draw,
             searched_nodes: 0,
             transposition_table: TranspositionTable::default(),
         }
@@ -39,7 +39,10 @@ impl Engine {
 }
 
 impl Engine {
-    pub async fn find_best_move(&mut self, game: &mut Game) -> (Option<MoveSequence>, i32, String) {
+    pub async fn find_best_move(
+        &mut self,
+        game: &mut Game,
+    ) -> (Option<MoveSequence>, Score, String) {
         if game.side_to_move != self.color {
             panic!("Engine is not playing as the side to move.");
         }
@@ -53,7 +56,7 @@ impl Engine {
         loop {
             self.current_depth += 1;
 
-            self.search_root(game, self.current_depth, -i32::MAX, i32::MAX);
+            self.search_root(game, self.current_depth, Score::Loss, Score::Win);
 
             let end_time = std::time::Instant::now();
             let elapsed_time = end_time - self.start_time;
@@ -75,26 +78,35 @@ impl Engine {
 
         (
             self.best_move.clone(),
-            self.best_score,
+            match self.color {
+                Color::Black => -self.best_score,
+                Color::White => self.best_score,
+            },
             principal_variation_line,
         )
     }
 }
 
 impl Engine {
-    fn search_root(&mut self, game: &mut Game, depth: usize, mut alpha: i32, mut beta: i32) -> i32 {
+    fn search_root(
+        &mut self,
+        game: &mut Game,
+        depth: usize,
+        mut alpha: Score,
+        mut beta: Score,
+    ) -> Score {
         if game.is_black_win() {
-            match game.side_to_move {
-                Color::White => return -i32::MAX,
-                Color::Black => return i32::MAX,
-            }
+            return match self.color {
+                Color::Black => Score::Win,
+                Color::White => Score::Loss,
+            };
         } else if game.is_white_win() {
-            match game.side_to_move {
-                Color::White => return i32::MAX,
-                Color::Black => return -i32::MAX,
-            }
+            return match self.color {
+                Color::Black => Score::Loss,
+                Color::White => Score::Win,
+            };
         } else if game.is_draw() {
-            return 0;
+            return Score::Draw;
         }
 
         let original_alpha = alpha;
@@ -131,7 +143,7 @@ impl Engine {
             principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
         }
 
-        let mut best_score = -i32::MAX;
+        let mut best_score = Score::Loss;
         let mut best_move = None;
         let mut available_moves = game.generate_move_sequences();
         Engine::order_moves(&mut available_moves, &principal_variation_move);
@@ -142,7 +154,7 @@ impl Engine {
             game.unmake_move_sequence();
 
             if self.stopped_searching {
-                return 0;
+                return Score::Draw;
             }
 
             if score >= beta {
@@ -189,7 +201,13 @@ impl Engine {
         best_score
     }
 
-    fn search(&mut self, game: &mut Game, depth: usize, mut alpha: i32, mut beta: i32) -> i32 {
+    fn search(
+        &mut self,
+        game: &mut Game,
+        depth: usize,
+        mut alpha: Score,
+        mut beta: Score,
+    ) -> Score {
         self.searched_nodes += 1;
 
         if self.searched_nodes % CHECK_EVERY_N_NODES == 0 {
@@ -198,7 +216,7 @@ impl Engine {
 
             if elapsed_time >= self.max_time {
                 self.stopped_searching = true;
-                return 0;
+                return Score::Draw;
             }
         }
 
@@ -207,17 +225,17 @@ impl Engine {
         }
 
         if game.is_black_win() {
-            match game.side_to_move {
-                Color::White => return -i32::MAX,
-                Color::Black => return i32::MAX,
-            }
+            return match self.color {
+                Color::Black => Score::Win,
+                Color::White => Score::Loss,
+            };
         } else if game.is_white_win() {
-            match game.side_to_move {
-                Color::White => return i32::MAX,
-                Color::Black => return -i32::MAX,
-            }
+            return match self.color {
+                Color::Black => Score::Loss,
+                Color::White => Score::Win,
+            };
         } else if game.is_draw() {
-            return 0;
+            return Score::Draw;
         }
 
         let orginal_alpha = alpha;
@@ -247,7 +265,7 @@ impl Engine {
             principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
         }
 
-        let mut best_score = -i32::MAX;
+        let mut best_score = Score::Loss;
         let mut best_move = None;
         let mut available_moves = game.generate_move_sequences();
         Engine::order_moves(&mut available_moves, &principal_variation_move);
@@ -258,7 +276,7 @@ impl Engine {
             game.unmake_move_sequence();
 
             if self.stopped_searching {
-                return 0;
+                return Score::Draw;
             }
 
             if score >= beta {
@@ -301,7 +319,7 @@ impl Engine {
         best_score
     }
 
-    fn quiescence_search(&mut self, game: &mut Game, mut alpha: i32, beta: i32) -> i32 {
+    fn quiescence_search(&mut self, game: &mut Game, mut alpha: Score, beta: Score) -> Score {
         self.searched_nodes += 1;
 
         if self.searched_nodes % CHECK_EVERY_N_NODES == 0 {
@@ -310,24 +328,22 @@ impl Engine {
 
             if elapsed_time >= self.max_time {
                 self.stopped_searching = true;
-                return 0;
+                return Score::Draw;
             }
         }
 
         if game.is_black_win() {
-            // println!("Black win detected in quiescence search");
-            match game.side_to_move {
-                Color::White => return -i32::MAX,
-                Color::Black => return i32::MAX,
-            }
+            return match self.color {
+                Color::Black => Score::Win,
+                Color::White => Score::Loss,
+            };
         } else if game.is_white_win() {
-            // println!("White win detected in quiescence search");
-            match game.side_to_move {
-                Color::White => return i32::MAX,
-                Color::Black => return -i32::MAX,
-            }
+            return match self.color {
+                Color::Black => Score::Loss,
+                Color::White => Score::Win,
+            };
         } else if game.is_draw() {
-            return 0;
+            return Score::Draw;
         }
 
         let standing_pat = match game.side_to_move {
@@ -352,7 +368,7 @@ impl Engine {
             game.unmake_move_sequence();
 
             if self.stopped_searching {
-                return 0;
+                return Score::Draw;
             }
 
             if score >= beta {
@@ -375,42 +391,55 @@ impl Engine {
     /// Returns a positive score if white is winning, and a negative score if black is winning.
     ///
     /// The score is calculated as follows:
-    /// - Material: 1000 for every man
-    /// - Kings: 1410 for every king
+    /// - Material: 100 for every man
+    /// - Kings: 141 for every king
     /// - positional advantages
-    pub fn evaluate(&mut self, game: &Game) -> i32 {
+    pub fn evaluate(&mut self, game: &Game) -> Score {
         // Score increases as white is winning, and decreases as black is winning.
         let mut score = 0;
 
         // Material
-        score += 1000 * (game.white.count() as i32 - game.black.count() as i32);
+        score += 100 * (game.white.count() as i32 - game.black.count() as i32);
 
         // Kings
-        score += 410 * (game.white_kings.count() as i32 - game.black_kings.count() as i32);
+        score += 41 * (game.white_kings.count() as i32 - game.black_kings.count() as i32);
 
         // Men advantages
-        score += 20
+        score += 2
             * ((game.white & Engine::WHITE_MEN_LIGHT).count() as i32
                 - (game.black & Engine::BLACK_MEN_LIGHT).count() as i32);
-        score += 30
+        score += 3
             * ((game.white & Engine::WHITE_MEN_MID).count() as i32
                 - (game.black & Engine::BLACK_MEN_MID).count() as i32);
-        score += 40
+        score += 4
             * ((game.white & Engine::WHITE_MEN_STRONG).count() as i32
                 - (game.black & Engine::BLACK_MEN_STRONG).count() as i32);
 
         // Kings advantages
-        score += 20
+        score += 2
             * ((game.white_kings & Engine::WHITE_KINGS_LIGHT).count() as i32
                 - (game.black_kings & Engine::BLACK_KINGS_LIGHT).count() as i32);
-        score += 30
+        score += 3
             * ((game.white_kings & Engine::WHITE_KINGS_MID).count() as i32
                 - (game.black_kings & Engine::BLACK_KINGS_MID).count() as i32);
-        score += 40
+        score += 4
             * ((game.white_kings & Engine::WHITE_KINGS_STRONG).count() as i32
                 - (game.black_kings & Engine::BLACK_KINGS_STRONG).count() as i32);
 
-        score
+        // Mobility
+        // since we're only evaluating quiet moves, we can consider the mobility of sliding pieces
+        score += match game.side_to_move {
+            Color::Black => {
+                let (lf, rf, lb, rb) = game.generate_black_slides();
+                (lf | rf | lb | rb).count() as i32
+            }
+            Color::White => {
+                let (lf, rf, lb, rb) = game.generate_white_slides();
+                (lf | rf | lb | rb).count() as i32
+            }
+        };
+
+        Score::Numeric(score)
     }
 }
 
@@ -460,6 +489,14 @@ impl Engine {
             } else {
                 moves.swap(0, index);
             }
+        }
+
+        if moves.iter().any(|ms| ms.is_promotion()) {
+            println!(
+                "moves: {:?}, pv: {:?} ",
+                moves,
+                principal_variation_move.clone()
+            );
         }
     }
 }

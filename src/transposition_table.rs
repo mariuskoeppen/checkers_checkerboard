@@ -14,7 +14,7 @@ pub enum TranspositionTableFlag {
 pub struct TranspositionTableEntry {
     pub key: u64,
     pub best_move_sequence: MoveSequence,
-    pub score: i32,
+    pub score: Score,
     pub depth: usize,
     pub flag: TranspositionTableFlag,
 }
@@ -24,7 +24,7 @@ impl TranspositionTableEntry {
         transposition_table: &TranspositionTable,
         game: &Game,
         best_move_sequence: MoveSequence,
-        score: i32,
+        score: Score,
         depth: usize,
         flag: TranspositionTableFlag,
     ) -> Self {
@@ -40,7 +40,7 @@ impl TranspositionTableEntry {
     pub fn create_with_key(
         key: u64,
         best_move_sequence: MoveSequence,
-        score: i32,
+        score: Score,
         depth: usize,
         flag: TranspositionTableFlag,
     ) -> Self {
@@ -57,7 +57,7 @@ impl TranspositionTableEntry {
         TranspositionTableEntry {
             key,
             best_move_sequence: MoveSequence::new(vec![]),
-            score: 0,
+            score: Score::Draw,
             depth: 0,
             flag: TranspositionTableFlag::Unknown,
         }
