@@ -3,7 +3,9 @@
 use std::time::Duration;
 
 use super::*;
-use crate::transposition_table::TranspositionTable;
+use crate::transposition_table::{
+    TranspositionTable, TranspositionTableEntry, TranspositionTableFlag,
+};
 
 const CHECK_EVERY_N_NODES: usize = 2_047;
 
@@ -102,35 +104,34 @@ impl Engine {
         let current_hash = self.transposition_table.hash(game);
         let mut principal_variation_move = None;
 
-        // if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
-        //     // draft ::= depth at the root - ply index
-        //     if transposition_table_entry.depth >= depth {
-        //         match transposition_table_entry.flag {
-        //             TranspositionTableFlag::Exact => {
-        //                 self.best_score = transposition_table_entry.score;
-        //                 self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
+        if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
+            if transposition_table_entry.depth >= depth {
+                match transposition_table_entry.flag {
+                    TranspositionTableFlag::Exact => {
+                        self.best_score = transposition_table_entry.score;
+                        self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
 
-        //                 return transposition_table_entry.score;
-        //             }
-        //             TranspositionTableFlag::LowerBound => {
-        //                 alpha = alpha.max(transposition_table_entry.score)
-        //             }
-        //             TranspositionTableFlag::UpperBound => {
-        //                 beta = beta.min(transposition_table_entry.score)
-        //             }
-        //             _ => panic!("should not have unknown flag in transposition table"),
-        //         }
+                        return transposition_table_entry.score;
+                    }
+                    TranspositionTableFlag::LowerBound => {
+                        alpha = alpha.max(transposition_table_entry.score)
+                    }
+                    TranspositionTableFlag::UpperBound => {
+                        beta = beta.min(transposition_table_entry.score)
+                    }
+                    _ => panic!("should not have unknown flag in transposition table"),
+                }
 
-        //         if alpha >= beta {
-        //             self.best_score = transposition_table_entry.score;
-        //             self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
+                if alpha >= beta {
+                    self.best_score = transposition_table_entry.score;
+                    self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
 
-        //             return transposition_table_entry.score;
-        //         }
-        //     }
+                    return transposition_table_entry.score;
+                }
+            }
 
-        //     principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
-        // }
+            principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
+        }
 
         let mut best_score = -Score::INFINITY;
         let mut best_move = None;
@@ -165,34 +166,25 @@ impl Engine {
         }
 
         if !self.stopped_searching {
-            // let transposition_table_entry = TranspositionTableEntry::create_with_key(
-            //     current_hash,
-            //     best_move.clone().unwrap(),
-            //     best_score,
-            //     depth,
-            //     if best_score <= original_alpha {
-            //         TranspositionTableFlag::UpperBound
-            //     } else if best_score >= beta {
-            //         TranspositionTableFlag::LowerBound
-            //     } else {
-            //         TranspositionTableFlag::Exact
-            //     },
-            // );
+            let transposition_table_entry = TranspositionTableEntry::create_with_key(
+                current_hash,
+                best_move.clone().unwrap(),
+                best_score,
+                depth,
+                if best_score <= original_alpha {
+                    TranspositionTableFlag::UpperBound
+                } else if best_score >= beta {
+                    TranspositionTableFlag::LowerBound
+                } else {
+                    TranspositionTableFlag::Exact
+                },
+            );
 
-            // self.transposition_table.insert(transposition_table_entry);
+            self.transposition_table.insert(transposition_table_entry);
 
             self.best_move = best_move;
             self.best_score = best_score;
         }
-
-        // if self.best_move.is_none() {
-        //     panic!(
-        //         "{:?}, stopped: {} ",
-        //         game.generate_move_sequences(),
-        //         self.stopped_searching
-        //     );
-        //     self.best_move = Some(game.generate_move_sequences()[0].clone());
-        // }
 
         best_score
     }
@@ -232,28 +224,28 @@ impl Engine {
         let current_hash = self.transposition_table.hash(game);
         let mut principal_variation_move = None;
 
-        // if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
-        //     if transposition_table_entry.depth >= depth {
-        //         match transposition_table_entry.flag {
-        //             TranspositionTableFlag::Exact => {
-        //                 return transposition_table_entry.score;
-        //             }
-        //             TranspositionTableFlag::LowerBound => {
-        //                 alpha = alpha.max(transposition_table_entry.score)
-        //             }
-        //             TranspositionTableFlag::UpperBound => {
-        //                 beta = beta.min(transposition_table_entry.score)
-        //             }
-        //             _ => panic!("should not have unknown flag in transposition table"),
-        //         }
+        if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
+            if transposition_table_entry.depth >= depth {
+                match transposition_table_entry.flag {
+                    TranspositionTableFlag::Exact => {
+                        return transposition_table_entry.score;
+                    }
+                    TranspositionTableFlag::LowerBound => {
+                        alpha = alpha.max(transposition_table_entry.score)
+                    }
+                    TranspositionTableFlag::UpperBound => {
+                        beta = beta.min(transposition_table_entry.score)
+                    }
+                    _ => panic!("should not have unknown flag in transposition table"),
+                }
 
-        //         if alpha >= beta {
-        //             return transposition_table_entry.score;
-        //         }
-        //     }
+                if alpha >= beta {
+                    return transposition_table_entry.score;
+                }
+            }
 
-        //     principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
-        // }
+            principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
+        }
 
         let mut best_score = -Score::INFINITY;
         let mut best_move = None;
@@ -291,23 +283,23 @@ impl Engine {
         //     println!("side to move: {:?}, depht: {}, best score: {}, alpha: {}, beta: {}, original alpha: {} ",game.side_to_move,  depth, best_score, alpha, beta, original_alpha);
         // }
 
-        // if !self.stopped_searching {
-        //     let transposition_table_entry = TranspositionTableEntry::create_with_key(
-        //         current_hash,
-        //         best_move.unwrap(),
-        //         best_score,
-        //         depth,
-        //         if best_score <= original_alpha {
-        //             TranspositionTableFlag::UpperBound
-        //         } else if best_score >= beta {
-        //             TranspositionTableFlag::LowerBound
-        //         } else {
-        //             TranspositionTableFlag::Exact
-        //         },
-        //     );
+        if !self.stopped_searching {
+            let transposition_table_entry = TranspositionTableEntry::create_with_key(
+                current_hash,
+                best_move.unwrap(),
+                best_score,
+                depth,
+                if best_score <= original_alpha {
+                    TranspositionTableFlag::UpperBound
+                } else if best_score >= beta {
+                    TranspositionTableFlag::LowerBound
+                } else {
+                    TranspositionTableFlag::Exact
+                },
+            );
 
-        //     self.transposition_table.insert(transposition_table_entry);
-        // }
+            self.transposition_table.insert(transposition_table_entry);
+        }
 
         best_score
     }
@@ -514,5 +506,36 @@ impl Engine {
         //         principal_variation_move.clone()
         //     );
         // }
+    }
+}
+
+impl Engine {
+    pub fn translate_score(score: i32, side_of_view: Color, current_ply: usize) -> String {
+        match side_of_view {
+            Color::Black => {
+                if score > 500_000 {
+                    // White is winning but we are black
+                    let distance = Score::WIN - score - current_ply as i32;
+                    return format!("++ in {}", distance);
+                } else if score < -500_000 {
+                    // Black is winning and we are black
+                    let distance = Score::WIN + score - current_ply as i32;
+                    return format!("-- in {}", distance);
+                }
+            }
+            Color::White => {
+                if score > 500_000 {
+                    // White is winning and we are white
+                    let distance = Score::WIN - score - current_ply as i32;
+                    return format!("++ in {}", distance);
+                } else if score < -500_000 {
+                    // Black is winning and we are white
+                    let distance = Score::WIN + score - current_ply as i32;
+                    return format!("-- in {}", distance);
+                }
+            }
+        }
+
+        return format!("{:.2}", score as f32 / 1000.0);
     }
 }
