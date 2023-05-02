@@ -1,13 +1,11 @@
-// #![allow(unused)]
+#![allow(unused)]
 
 use std::time::Duration;
 
 use super::*;
-use crate::transposition_table::{
-    TranspositionTable, TranspositionTableEntry, TranspositionTableFlag,
-};
+use crate::transposition_table::TranspositionTable;
 
-const CHECK_EVERY_N_NODES: usize = 25_000;
+const CHECK_EVERY_N_NODES: usize = 2_047;
 
 #[derive(Debug)]
 pub struct Engine {
@@ -17,7 +15,7 @@ pub struct Engine {
     start_time: std::time::Instant,
     stopped_searching: bool,
     pub best_move: Option<MoveSequence>,
-    pub best_score: Score,
+    pub best_score: i32,
     pub searched_nodes: usize,
     transposition_table: TranspositionTable,
 }
@@ -31,7 +29,7 @@ impl Engine {
             start_time: std::time::Instant::now(),
             stopped_searching: false,
             best_move: None,
-            best_score: Score::Draw,
+            best_score: Score::DRAW,
             searched_nodes: 0,
             transposition_table: TranspositionTable::default(),
         }
@@ -39,10 +37,7 @@ impl Engine {
 }
 
 impl Engine {
-    pub async fn find_best_move(
-        &mut self,
-        game: &mut Game,
-    ) -> (Option<MoveSequence>, Score, String) {
+    pub async fn find_best_move(&mut self, game: &mut Game) -> (Option<MoveSequence>, i32, String) {
         if game.side_to_move != self.color {
             panic!("Engine is not playing as the side to move.");
         }
@@ -56,7 +51,7 @@ impl Engine {
         loop {
             self.current_depth += 1;
 
-            self.search_root(game, self.current_depth, Score::Loss, Score::Win);
+            self.search_root(game, self.current_depth, -Score::INFINITY, Score::INFINITY);
 
             let end_time = std::time::Instant::now();
             let elapsed_time = end_time - self.start_time;
@@ -88,62 +83,56 @@ impl Engine {
 }
 
 impl Engine {
-    fn search_root(
-        &mut self,
-        game: &mut Game,
-        depth: usize,
-        mut alpha: Score,
-        mut beta: Score,
-    ) -> Score {
+    fn search_root(&mut self, game: &mut Game, depth: usize, mut alpha: i32, mut beta: i32) -> i32 {
         if game.is_black_win() {
-            return match self.color {
-                Color::Black => Score::Win,
-                Color::White => Score::Loss,
+            return match game.side_to_move {
+                Color::Black => Score::WIN - game.ply as i32,
+                Color::White => -Score::WIN + game.ply as i32,
             };
         } else if game.is_white_win() {
-            return match self.color {
-                Color::Black => Score::Loss,
-                Color::White => Score::Win,
+            return match game.side_to_move {
+                Color::Black => -Score::WIN + game.ply as i32,
+                Color::White => Score::WIN - game.ply as i32,
             };
         } else if game.is_draw() {
-            return Score::Draw;
+            return Score::DRAW;
         }
 
         let original_alpha = alpha;
         let current_hash = self.transposition_table.hash(game);
         let mut principal_variation_move = None;
 
-        if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
-            // draft ::= depth at the root - ply index
-            if transposition_table_entry.depth >= depth {
-                match transposition_table_entry.flag {
-                    TranspositionTableFlag::Exact => {
-                        self.best_score = transposition_table_entry.score;
-                        self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
+        // if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
+        //     // draft ::= depth at the root - ply index
+        //     if transposition_table_entry.depth >= depth {
+        //         match transposition_table_entry.flag {
+        //             TranspositionTableFlag::Exact => {
+        //                 self.best_score = transposition_table_entry.score;
+        //                 self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
 
-                        return transposition_table_entry.score;
-                    }
-                    TranspositionTableFlag::LowerBound => {
-                        alpha = alpha.max(transposition_table_entry.score)
-                    }
-                    TranspositionTableFlag::UpperBound => {
-                        beta = beta.min(transposition_table_entry.score)
-                    }
-                    _ => panic!("should not have unknown flag in transposition table"),
-                }
+        //                 return transposition_table_entry.score;
+        //             }
+        //             TranspositionTableFlag::LowerBound => {
+        //                 alpha = alpha.max(transposition_table_entry.score)
+        //             }
+        //             TranspositionTableFlag::UpperBound => {
+        //                 beta = beta.min(transposition_table_entry.score)
+        //             }
+        //             _ => panic!("should not have unknown flag in transposition table"),
+        //         }
 
-                if alpha >= beta {
-                    self.best_score = transposition_table_entry.score;
-                    self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
+        //         if alpha >= beta {
+        //             self.best_score = transposition_table_entry.score;
+        //             self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
 
-                    return transposition_table_entry.score;
-                }
-            }
+        //             return transposition_table_entry.score;
+        //         }
+        //     }
 
-            principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
-        }
+        //     principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
+        // }
 
-        let mut best_score = Score::Loss;
+        let mut best_score = -Score::INFINITY;
         let mut best_move = None;
         let mut available_moves = game.generate_move_sequences();
         Engine::order_moves(&mut available_moves, &principal_variation_move);
@@ -154,13 +143,7 @@ impl Engine {
             game.unmake_move_sequence();
 
             if self.stopped_searching {
-                return Score::Draw;
-            }
-
-            if score >= beta {
-                best_score = score;
-                best_move = Some(m);
-                break;
+                return Score::DRAW;
             }
 
             if score > best_score {
@@ -168,46 +151,53 @@ impl Engine {
                 best_move = Some(m);
 
                 if score > alpha {
+                    if score >= beta {
+                        // Might want to store this in the transposition table
+                        // Also might want to store killer moves
+                        /*  */
+                        best_score = beta;
+                        break;
+                    }
+
                     alpha = score;
                 }
-            } else if score == best_score {
-                // TODO: implement a better tie breaking mechanism
-                best_score = score;
-                best_move = Some(m);
             }
         }
 
         if !self.stopped_searching {
-            let transposition_table_entry = TranspositionTableEntry::create_with_key(
-                current_hash,
-                best_move.clone().unwrap(),
-                best_score,
-                depth,
-                if best_score <= original_alpha {
-                    TranspositionTableFlag::UpperBound
-                } else if best_score >= beta {
-                    TranspositionTableFlag::LowerBound
-                } else {
-                    TranspositionTableFlag::Exact
-                },
-            );
+            // let transposition_table_entry = TranspositionTableEntry::create_with_key(
+            //     current_hash,
+            //     best_move.clone().unwrap(),
+            //     best_score,
+            //     depth,
+            //     if best_score <= original_alpha {
+            //         TranspositionTableFlag::UpperBound
+            //     } else if best_score >= beta {
+            //         TranspositionTableFlag::LowerBound
+            //     } else {
+            //         TranspositionTableFlag::Exact
+            //     },
+            // );
 
-            self.transposition_table.insert(transposition_table_entry);
+            // self.transposition_table.insert(transposition_table_entry);
 
             self.best_move = best_move;
             self.best_score = best_score;
         }
 
+        // if self.best_move.is_none() {
+        //     panic!(
+        //         "{:?}, stopped: {} ",
+        //         game.generate_move_sequences(),
+        //         self.stopped_searching
+        //     );
+        //     self.best_move = Some(game.generate_move_sequences()[0].clone());
+        // }
+
         best_score
     }
 
-    fn search(
-        &mut self,
-        game: &mut Game,
-        depth: usize,
-        mut alpha: Score,
-        mut beta: Score,
-    ) -> Score {
+    fn search(&mut self, game: &mut Game, depth: usize, mut alpha: i32, mut beta: i32) -> i32 {
         self.searched_nodes += 1;
 
         if self.searched_nodes % CHECK_EVERY_N_NODES == 0 {
@@ -216,7 +206,7 @@ impl Engine {
 
             if elapsed_time >= self.max_time {
                 self.stopped_searching = true;
-                return Score::Draw;
+                return Score::DRAW;
             }
         }
 
@@ -225,47 +215,47 @@ impl Engine {
         }
 
         if game.is_black_win() {
-            return match self.color {
-                Color::Black => Score::Win,
-                Color::White => Score::Loss,
+            return match game.side_to_move {
+                Color::Black => Score::WIN - game.ply as i32,
+                Color::White => -Score::WIN + game.ply as i32,
             };
         } else if game.is_white_win() {
-            return match self.color {
-                Color::Black => Score::Loss,
-                Color::White => Score::Win,
+            return match game.side_to_move {
+                Color::Black => -Score::WIN + game.ply as i32,
+                Color::White => Score::WIN - game.ply as i32,
             };
         } else if game.is_draw() {
-            return Score::Draw;
+            return Score::DRAW;
         }
 
-        let orginal_alpha = alpha;
+        let original_alpha = alpha;
         let current_hash = self.transposition_table.hash(game);
         let mut principal_variation_move = None;
 
-        if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
-            if transposition_table_entry.depth >= depth {
-                match transposition_table_entry.flag {
-                    TranspositionTableFlag::Exact => {
-                        return transposition_table_entry.score;
-                    }
-                    TranspositionTableFlag::LowerBound => {
-                        alpha = alpha.max(transposition_table_entry.score)
-                    }
-                    TranspositionTableFlag::UpperBound => {
-                        beta = beta.min(transposition_table_entry.score)
-                    }
-                    _ => panic!("should not have unknown flag in transposition table"),
-                }
+        // if let Some(transposition_table_entry) = self.transposition_table.fetch(current_hash) {
+        //     if transposition_table_entry.depth >= depth {
+        //         match transposition_table_entry.flag {
+        //             TranspositionTableFlag::Exact => {
+        //                 return transposition_table_entry.score;
+        //             }
+        //             TranspositionTableFlag::LowerBound => {
+        //                 alpha = alpha.max(transposition_table_entry.score)
+        //             }
+        //             TranspositionTableFlag::UpperBound => {
+        //                 beta = beta.min(transposition_table_entry.score)
+        //             }
+        //             _ => panic!("should not have unknown flag in transposition table"),
+        //         }
 
-                if alpha >= beta {
-                    return transposition_table_entry.score;
-                }
-            }
+        //         if alpha >= beta {
+        //             return transposition_table_entry.score;
+        //         }
+        //     }
 
-            principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
-        }
+        //     principal_variation_move = Some(transposition_table_entry.best_move_sequence.clone());
+        // }
 
-        let mut best_score = Score::Loss;
+        let mut best_score = -Score::INFINITY;
         let mut best_move = None;
         let mut available_moves = game.generate_move_sequences();
         Engine::order_moves(&mut available_moves, &principal_variation_move);
@@ -276,13 +266,7 @@ impl Engine {
             game.unmake_move_sequence();
 
             if self.stopped_searching {
-                return Score::Draw;
-            }
-
-            if score >= beta {
-                best_score = score;
-                best_move = Some(m);
-                break;
+                return Score::DRAW;
             }
 
             if score > best_score {
@@ -290,36 +274,45 @@ impl Engine {
                 best_move = Some(m);
 
                 if score > alpha {
+                    if score >= beta {
+                        // Might want to store this in the transposition table
+                        // Also might want to store killer moves
+                        /*  */
+                        best_score = beta;
+                        break;
+                    }
+
                     alpha = score;
                 }
-            } else if score == best_score {
-                best_score = score;
-                best_move = Some(m);
             }
         }
 
-        if !self.stopped_searching {
-            let transposition_table_entry = TranspositionTableEntry::create_with_key(
-                current_hash,
-                best_move.unwrap(),
-                best_score,
-                depth,
-                if best_score <= orginal_alpha {
-                    TranspositionTableFlag::UpperBound
-                } else if best_score >= beta {
-                    TranspositionTableFlag::LowerBound
-                } else {
-                    TranspositionTableFlag::Exact
-                },
-            );
+        // if best_move.is_none() {
+        //     println!("side to move: {:?}, depht: {}, best score: {}, alpha: {}, beta: {}, original alpha: {} ",game.side_to_move,  depth, best_score, alpha, beta, original_alpha);
+        // }
 
-            self.transposition_table.insert(transposition_table_entry);
-        }
+        // if !self.stopped_searching {
+        //     let transposition_table_entry = TranspositionTableEntry::create_with_key(
+        //         current_hash,
+        //         best_move.unwrap(),
+        //         best_score,
+        //         depth,
+        //         if best_score <= original_alpha {
+        //             TranspositionTableFlag::UpperBound
+        //         } else if best_score >= beta {
+        //             TranspositionTableFlag::LowerBound
+        //         } else {
+        //             TranspositionTableFlag::Exact
+        //         },
+        //     );
+
+        //     self.transposition_table.insert(transposition_table_entry);
+        // }
 
         best_score
     }
 
-    fn quiescence_search(&mut self, game: &mut Game, mut alpha: Score, beta: Score) -> Score {
+    fn quiescence_search(&mut self, game: &mut Game, mut alpha: i32, beta: i32) -> i32 {
         self.searched_nodes += 1;
 
         if self.searched_nodes % CHECK_EVERY_N_NODES == 0 {
@@ -328,28 +321,25 @@ impl Engine {
 
             if elapsed_time >= self.max_time {
                 self.stopped_searching = true;
-                return Score::Draw;
+                return Score::DRAW;
             }
         }
 
         if game.is_black_win() {
-            return match self.color {
-                Color::Black => Score::Win,
-                Color::White => Score::Loss,
+            return match game.side_to_move {
+                Color::Black => Score::WIN - game.ply as i32,
+                Color::White => -Score::WIN + game.ply as i32,
             };
         } else if game.is_white_win() {
-            return match self.color {
-                Color::Black => Score::Loss,
-                Color::White => Score::Win,
+            return match game.side_to_move {
+                Color::Black => -Score::WIN + game.ply as i32,
+                Color::White => Score::WIN - game.ply as i32,
             };
         } else if game.is_draw() {
-            return Score::Draw;
+            return Score::DRAW;
         }
 
-        let standing_pat = match game.side_to_move {
-            Color::White => self.evaluate(game),
-            Color::Black => -self.evaluate(game),
-        };
+        let standing_pat = self.evaluate(game);
 
         if standing_pat >= beta {
             return beta;
@@ -368,7 +358,7 @@ impl Engine {
             game.unmake_move_sequence();
 
             if self.stopped_searching {
-                return Score::Draw;
+                return Score::DRAW;
             }
 
             if score >= beta {
@@ -394,52 +384,59 @@ impl Engine {
     /// - Material: 100 for every man
     /// - Kings: 141 for every king
     /// - positional advantages
-    pub fn evaluate(&mut self, game: &Game) -> Score {
+    pub fn evaluate(&mut self, game: &Game) -> i32 {
         // Score increases as white is winning, and decreases as black is winning.
-        let mut score = 0;
+        let mut score = Score::DRAW; /* score = 0 */
 
         // Material
-        score += 100 * (game.white.count() as i32 - game.black.count() as i32);
+        score += 1000 * (game.white.count() as i32 - game.black.count() as i32);
 
         // Kings
-        score += 41 * (game.white_kings.count() as i32 - game.black_kings.count() as i32);
+        score += 410 * (game.white_kings.count() as i32 - game.black_kings.count() as i32);
 
         // Men advantages
-        score += 2
+        score += 10
             * ((game.white & Engine::WHITE_MEN_LIGHT).count() as i32
                 - (game.black & Engine::BLACK_MEN_LIGHT).count() as i32);
-        score += 3
+        score += 20
             * ((game.white & Engine::WHITE_MEN_MID).count() as i32
                 - (game.black & Engine::BLACK_MEN_MID).count() as i32);
-        score += 4
+        score += 30
             * ((game.white & Engine::WHITE_MEN_STRONG).count() as i32
                 - (game.black & Engine::BLACK_MEN_STRONG).count() as i32);
 
         // Kings advantages
-        score += 2
+        score += 20
             * ((game.white_kings & Engine::WHITE_KINGS_LIGHT).count() as i32
                 - (game.black_kings & Engine::BLACK_KINGS_LIGHT).count() as i32);
-        score += 3
+        score += 30
             * ((game.white_kings & Engine::WHITE_KINGS_MID).count() as i32
                 - (game.black_kings & Engine::BLACK_KINGS_MID).count() as i32);
-        score += 4
+        score += 40
             * ((game.white_kings & Engine::WHITE_KINGS_STRONG).count() as i32
                 - (game.black_kings & Engine::BLACK_KINGS_STRONG).count() as i32);
 
-        // Mobility
-        // since we're only evaluating quiet moves, we can consider the mobility of sliding pieces
-        score += match game.side_to_move {
-            Color::Black => {
-                let (lf, rf, lb, rb) = game.generate_black_slides();
-                (lf | rf | lb | rb).count() as i32
-            }
-            Color::White => {
-                let (lf, rf, lb, rb) = game.generate_white_slides();
-                (lf | rf | lb | rb).count() as i32
-            }
-        };
+        // // Mobility
+        // // since we're only evaluating quiet moves, we can consider the mobility of sliding pieces
+        // match game.side_to_move {
+        //     Color::White => {
+        //         let (lf, rf, lb, rb) = game.generate_white_slides();
+        //         score += (lf | rf | lb | rb).count() as i32;
+        //     }
+        //     Color::Black => {
+        //         let (lf, rf, lb, rb) = game.generate_black_slides();
+        //         score -= (lf | rf | lb | rb).count() as i32;
+        //     }
+        // }
 
-        Score::Numeric(score)
+        match game.side_to_move {
+            Color::White => {
+                return score;
+            }
+            Color::Black => {
+                return -score;
+            }
+        }
     }
 }
 
@@ -469,34 +466,53 @@ impl Engine {
     /// - king captures
     /// - promotions
     fn order_moves(moves: &mut Vec<MoveSequence>, principal_variation_move: &Option<MoveSequence>) {
-        moves.sort_unstable_by(|a, b| {
-            let a_score = a.score();
-            let b_score = b.score();
-            b_score.partial_cmp(&a_score).unwrap()
-        });
+        // moves.sort_unstable_by(|a, b| {
+        //     let a_score = a.score();
+        //     let b_score = b.score();
+        //     b_score.partial_cmp(&a_score).unwrap()
+        // });
 
-        // Move the principal variation move to the front of the list.
-        // Might further improve this by instead of swapping, moving the principal variation move to the front of the list and filling the gap.
+        // // Move the principal variation move to the front of the list.
+        // // Might further improve this by instead of swapping, moving the principal variation move to the front of the list and filling the gap.
+        // if let Some(principal_variation_move) = principal_variation_move {
+        //     let index = moves
+        //         .iter()
+        //         .position(|m| m == principal_variation_move)
+        //         .expect("principal variation move should be in list of moves");
+
+        //     if index > 1 {
+        //         let item = moves.remove(index);
+        //         moves.insert(0, item);
+        //     } else {
+        //         moves.swap(0, index);
+        //     }
+        // }
+
         if let Some(principal_variation_move) = principal_variation_move {
-            let index = moves
-                .iter()
-                .position(|m| m == principal_variation_move)
-                .expect("principal variation move should be in list of moves");
+            moves.sort_unstable_by(|a, b| {
+                if a == principal_variation_move {
+                    return std::cmp::Ordering::Less;
+                } else if b == principal_variation_move {
+                    return std::cmp::Ordering::Greater;
+                }
 
-            if index > 1 {
-                let item = moves.remove(index);
-                moves.insert(0, item);
-            } else {
-                moves.swap(0, index);
-            }
+                let a_score = a.score();
+                let b_score = b.score();
+                b_score.partial_cmp(&a_score).unwrap()
+            });
+        } else {
+            moves.sort_unstable_by(|a, b| {
+                let a_score = a.score();
+                let b_score = b.score();
+                b_score.partial_cmp(&a_score).unwrap()
+            });
         }
-
-        if moves.iter().any(|ms| ms.is_promotion()) {
-            println!(
-                "moves: {:?}, pv: {:?} ",
-                moves,
-                principal_variation_move.clone()
-            );
-        }
+        // if principal_variation_move.is_some() && moves.iter().any(|ms| ms.is_promotion()) {
+        //     println!(
+        //         "moves: {:?}, pv: {:?} ",
+        //         moves,
+        //         principal_variation_move.clone()
+        //     );
+        // }
     }
 }

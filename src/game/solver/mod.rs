@@ -8,65 +8,83 @@ pub use engine::*;
 
 use crate::game::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Score {
-    /* Might want to add a "win in x plies" to Win and Loss */
-    Win,
-    Loss,
-    Draw,
-    Numeric(i32),
+#[derive(Debug, Clone, PartialEq)]
+pub struct Score;
+
+impl Score {
+    pub const INFINITY: i32 = 2_000_000;
+    pub const WIN: i32 = 1_000_000;
+    pub const DRAW: i32 = 0;
 }
 
-impl PartialOrd for Score {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        match (self, other) {
-            (Score::Win, Score::Win) => Some(std::cmp::Ordering::Equal),
-            (Score::Win, _) => Some(std::cmp::Ordering::Greater),
-            (_, Score::Win) => Some(std::cmp::Ordering::Less),
+// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// pub enum ScoreOld {
+//     /* Might want to add a "win in x plies" to Win and Loss */
+//     /// The maximizing player (white) is winning.
+//     /// The minimizing player (black) is losing.
+//     Win,
+//     /// The minimizing player (black) is winning.
+//     /// The maximizing player (white) is losing.
+//     Loss,
+//     /// The game is a (literal) draw.
+//     /// Literal meaning that the game is over,
+//     /// and not just a positional balance.
+//     /// Might also mean the search has exhausted its time.
+//     Draw,
+//     /// Score is a number returned by the evaluation function.
+//     Numeric(i32),
+// }
 
-            (Score::Loss, Score::Loss) => Some(std::cmp::Ordering::Equal),
-            (Score::Loss, _) => Some(std::cmp::Ordering::Less),
-            (_, Score::Loss) => Some(std::cmp::Ordering::Greater),
+// impl PartialOrd for ScoreOld {
+//     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+//         match (self, other) {
+//             (ScoreOld::Win, ScoreOld::Win) => Some(std::cmp::Ordering::Equal),
+//             (ScoreOld::Win, _) => Some(std::cmp::Ordering::Greater),
+//             (_, ScoreOld::Win) => Some(std::cmp::Ordering::Less),
 
-            (Score::Draw, Score::Draw) => Some(std::cmp::Ordering::Equal),
-            (Score::Draw, Score::Numeric(n)) => n.partial_cmp(&0),
-            (Score::Numeric(n), Score::Draw) => n.partial_cmp(&0),
+//             (ScoreOld::Loss, ScoreOld::Loss) => Some(std::cmp::Ordering::Equal),
+//             (ScoreOld::Loss, _) => Some(std::cmp::Ordering::Less),
+//             (_, ScoreOld::Loss) => Some(std::cmp::Ordering::Greater),
 
-            (Score::Numeric(a), Score::Numeric(b)) => a.partial_cmp(b),
-        }
-    }
-}
+//             (ScoreOld::Draw, ScoreOld::Draw) => Some(std::cmp::Ordering::Equal),
+//             (ScoreOld::Draw, ScoreOld::Numeric(n)) => n.partial_cmp(&0),
+//             (ScoreOld::Numeric(n), ScoreOld::Draw) => n.partial_cmp(&0),
 
-impl Ord for Score {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other)
-            .expect("there is no ordering for these scores")
-    }
-}
+//             (ScoreOld::Numeric(a), ScoreOld::Numeric(b)) => a.partial_cmp(b),
+//         }
+//     }
+// }
 
-impl std::ops::Neg for Score {
-    type Output = Self;
+// impl Ord for ScoreOld {
+//     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+//         self.partial_cmp(other)
+//             .expect("there is no ordering for these scores")
+//     }
+// }
 
-    fn neg(self) -> Self::Output {
-        match self {
-            Score::Win => Score::Loss,
-            Score::Loss => Score::Win,
-            Score::Draw => Score::Draw,
-            Score::Numeric(n) => Score::Numeric(-n),
-        }
-    }
-}
+// impl std::ops::Neg for ScoreOld {
+//     type Output = Self;
 
-impl std::fmt::Display for Score {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Score::Win => write!(f, "+Infinity"),
-            Score::Loss => write!(f, "-Infinity"),
-            Score::Draw => write!(f, "Draw"),
-            Score::Numeric(n) => write!(f, "{}", n),
-        }
-    }
-}
+//     fn neg(self) -> Self::Output {
+//         match self {
+//             ScoreOld::Win => ScoreOld::Loss,
+//             ScoreOld::Loss => ScoreOld::Win,
+//             ScoreOld::Draw => ScoreOld::Draw,
+//             ScoreOld::Numeric(n) => ScoreOld::Numeric(-n),
+//         }
+//     }
+// }
+
+// impl std::fmt::Display for ScoreOld {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             ScoreOld::Win => write!(f, "+Infinity"),
+//             ScoreOld::Loss => write!(f, "-Infinity"),
+//             ScoreOld::Draw => write!(f, "Draw"),
+//             ScoreOld::Numeric(n) => write!(f, "{}", n),
+//         }
+//     }
+// }
 
 pub trait Solver {
     /// Returns the best move and score for the current player.

@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use crate::{game::*, helpers::PositionMapper};
+use crate::{game::*, helpers::PositionMapper, transposition_table::TranspositionTable};
 
 #[derive(Debug)]
 pub struct Game {
@@ -21,6 +21,10 @@ pub struct Game {
     pub move_history: Vec<MoveSequence>,
     /// The current ply. One ply = one side's turn (half-move).
     pub ply: usize,
+    /// Only needed for hashing so we can determine if a position has occured three times (draw).
+    transposition_table: TranspositionTable,
+    move_history_hash: Vec<u64>,
+    current_hash: u64,
 }
 
 impl Default for Game {
@@ -39,7 +43,7 @@ impl Game {
         // let white = Bitboard::from_u64(825439027200);
         // let black = Bitboard::from_u64(16777216);
 
-        Self {
+        let mut game = Self {
             white,
             black,
             white_kings: Bitboard::EMPTY,
@@ -47,7 +51,14 @@ impl Game {
             side_to_move: Color::Black,
             move_history: Vec::new(),
             ply: 0,
-        }
+            transposition_table: TranspositionTable::new(0),
+            move_history_hash: Vec::new(),
+            current_hash: 0,
+        };
+
+        game.current_hash = game.transposition_table.hash(&game);
+
+        game
     }
 
     pub fn not_occupied(&self) -> Bitboard {
@@ -61,11 +72,24 @@ impl Game {
 
     pub fn is_black_win(&mut self) -> bool {
         // We might want to optimize this by not neccecarily generating all the moves
-        self.white.is_empty() || self.generate_white_move_sequences().is_empty()
+        if self.white.is_empty() {
+            return true;
+        }
+        match self.side_to_move {
+            Color::Black => false,
+            Color::White => self.generate_white_move_sequences().is_empty(),
+        }
     }
 
     pub fn is_white_win(&mut self) -> bool {
-        self.black.is_empty() || self.generate_black_move_sequences().is_empty()
+        // We might want to optimize this by not neccecarily generating all the moves
+        if self.black.is_empty() {
+            return true;
+        }
+        match self.side_to_move {
+            Color::Black => self.generate_black_move_sequences().is_empty(),
+            Color::White => false,
+        }
     }
 
     pub fn is_draw(&self) -> bool {
@@ -74,15 +98,25 @@ impl Game {
             return false;
         }
 
-        // let last_move = self.move_history.last().expect("No moves made yet");
-        // let occured_three_times = self.move_history.iter().filter(|m| m == &last_move).count() >= 3;
-        // if occured_three_times {
-        //     return true;
-        // }
+        if self
+            .move_history_hash
+            .iter()
+            .rev()
+            .take(6)
+            .filter(|&&h| h == self.current_hash)
+            .count()
+            >= 3
+        {
+            // println!(
+            //     "Draw by repetition {:?}, {:?} ",
+            //     self.move_history_hash, self.move_history
+            // );
+            return true;
+        }
 
         // 2. The game is a draw if for 50 plies no irreversible move is played
         // e.g. no piece is captured and no pawn is moved.
-        if self.ply < 50 {
+        if self.ply < 100 {
             return false;
         }
 
@@ -90,7 +124,7 @@ impl Game {
             .move_history
             .iter()
             .rev()
-            .take(50)
+            .take(100)
             .any(|ms| ms.is_irreversible())
     }
 }
@@ -122,18 +156,33 @@ impl Game {
         Err("No valid move sequences found".to_string())
     }
 
-    pub fn to_console_string(&self) -> String {
+    pub fn to_console_string(&mut self) -> String {
         let mut s = String::new();
 
         s += "\n------------------------------------------------------------\n";
 
         s += &format!("{}: ", &self.ply.to_string());
-        s += match self.side_to_move {
-            Color::White => "White moves next ",
-            Color::Black => "Black moves next ",
-        };
+        if self.is_draw() {
+            s += "Draw ";
+        } else if self.is_white_win() {
+            s += "White wins ";
+        } else if self.is_black_win() {
+            s += "Black wins ";
+        } else {
+            s += match self.side_to_move {
+                Color::White => "White moves next ",
+                Color::Black => "Black moves next ",
+            };
+        }
+
         let mut e = Engine::new(self.side_to_move.clone(), Duration::from_secs(1));
-        s += &format!("<{}>", e.evaluate(self));
+        s += &format!(
+            "<{}>",
+            match self.side_to_move {
+                Color::Black => -e.evaluate(self),
+                Color::White => e.evaluate(self),
+            }
+        );
         s += "\n\n";
 
         for row in 0..8 {
@@ -211,16 +260,26 @@ impl Game {
         self.ply += 1;
         self.side_to_move.switch();
         self.move_history.push(moves_sequence.clone());
+        let hash =
+            self.transposition_table
+                .hash_move_sequence(self.current_hash, moves_sequence, true);
+
+        // assert!(hash != self.current_hash);
+        self.move_history_hash.push(self.current_hash);
+        self.current_hash = hash;
     }
 
     pub fn unmake_move_sequence(&mut self) {
         let move_sequence = self.move_history.pop().expect("No moves to unmake");
-        for mov in move_sequence.into_iter().rev() {
+        for mov in move_sequence.clone().into_iter().rev() {
             self.unmake_move(&mov);
         }
 
         self.ply -= 1;
         self.side_to_move.switch();
+        let last_hash = self.move_history_hash.pop().expect("No moves to unmake");
+        // assert!(last_hash != self.current_hash);
+        self.current_hash = last_hash;
     }
 
     pub fn make_move(&mut self, mov: &Move) {

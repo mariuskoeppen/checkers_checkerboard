@@ -1,4 +1,4 @@
-use std::vec;
+use std::{collections::HashMap, vec};
 
 use super::game::*;
 
@@ -14,7 +14,7 @@ pub enum TranspositionTableFlag {
 pub struct TranspositionTableEntry {
     pub key: u64,
     pub best_move_sequence: MoveSequence,
-    pub score: Score,
+    pub score: i32,
     pub depth: usize,
     pub flag: TranspositionTableFlag,
 }
@@ -24,7 +24,7 @@ impl TranspositionTableEntry {
         transposition_table: &TranspositionTable,
         game: &Game,
         best_move_sequence: MoveSequence,
-        score: Score,
+        score: i32,
         depth: usize,
         flag: TranspositionTableFlag,
     ) -> Self {
@@ -40,7 +40,7 @@ impl TranspositionTableEntry {
     pub fn create_with_key(
         key: u64,
         best_move_sequence: MoveSequence,
-        score: Score,
+        score: i32,
         depth: usize,
         flag: TranspositionTableFlag,
     ) -> Self {
@@ -57,7 +57,7 @@ impl TranspositionTableEntry {
         TranspositionTableEntry {
             key,
             best_move_sequence: MoveSequence::new(vec![]),
-            score: Score::Draw,
+            score: Score::DRAW,
             depth: 0,
             flag: TranspositionTableFlag::Unknown,
         }
@@ -78,19 +78,6 @@ impl TranspositionTableHashMap {
         }
 
         TranspositionTableHashMap(array)
-    }
-
-    pub fn check_type_1_errors(&self) -> bool {
-        let mut set = std::collections::HashSet::new();
-
-        for i in 0..64 {
-            if set.contains(&self.0[i]) {
-                return true;
-            }
-            set.insert(self.0[i]);
-        }
-
-        false
     }
 }
 
@@ -120,30 +107,12 @@ impl TranspositionTable {
         let side_hash = rng.gen();
         // let draw_hash = rng.gen();
 
-        let mut white_hashmap = TranspositionTableHashMap::default();
-        let mut black_hashmap = TranspositionTableHashMap::default();
-        let mut white_kings_hashmap = TranspositionTableHashMap::default();
-        let mut black_kings_hashmap = TranspositionTableHashMap::default();
+        let white_hashmap = TranspositionTableHashMap::default();
+        let black_hashmap = TranspositionTableHashMap::default();
+        let white_kings_hashmap = TranspositionTableHashMap::default();
+        let black_kings_hashmap = TranspositionTableHashMap::default();
 
-        // We should check for type 1 errors in the hashmaps.
-        // Type 1 errors are when two different indices in the hashmap have the same value.
-        // This is a problem because it means that the hash function is not injective.
-        // This means that the hash function is not one-to-one, which means that it's not
-        // possible to get the original value from the hash.
-        while white_hashmap.check_type_1_errors() {
-            white_hashmap = TranspositionTableHashMap::default();
-        }
-        while black_hashmap.check_type_1_errors() {
-            black_hashmap = TranspositionTableHashMap::default();
-        }
-        while white_kings_hashmap.check_type_1_errors() {
-            white_kings_hashmap = TranspositionTableHashMap::default();
-        }
-        while black_kings_hashmap.check_type_1_errors() {
-            black_kings_hashmap = TranspositionTableHashMap::default();
-        }
-
-        TranspositionTable {
+        let mut tt = TranspositionTable {
             table_size,
             table: vec![None; table_size],
             white_hashmap,
@@ -151,7 +120,32 @@ impl TranspositionTable {
             white_kings_hashmap,
             black_kings_hashmap,
             side_hash,
+        };
+
+        // We should check for type 1 errors in the hashmaps.
+        // Type 1 errors are when two different indices in the hashmap have the same value.
+        // This is a problem because it means that the hash function is not injective.
+        // This means that the hash function is not one-to-one, which means that it's not
+        // possible to get the original value from the hash.
+
+        while !tt.assert_no_collisions() {
+            let white_hashmap = TranspositionTableHashMap::default();
+            let black_hashmap = TranspositionTableHashMap::default();
+            let white_kings_hashmap = TranspositionTableHashMap::default();
+            let black_kings_hashmap = TranspositionTableHashMap::default();
+
+            tt = TranspositionTable {
+                table_size,
+                table: vec![None; table_size],
+                white_hashmap,
+                black_hashmap,
+                white_kings_hashmap,
+                black_kings_hashmap,
+                side_hash,
+            };
         }
+
+        tt
     }
 }
 
@@ -298,7 +292,53 @@ impl TranspositionTable {
             hash ^= self.side_hash;
         }
 
+        // assert!(hash != key);
+
         hash
+    }
+}
+
+impl TranspositionTable {
+    fn assert_no_collisions(&self) -> bool {
+        let mut key_map = HashMap::new();
+
+        for key in self.white_hashmap.0.iter() {
+            if key_map.contains_key(key) {
+                return false;
+            } else {
+                key_map.insert(key, true);
+            }
+        }
+
+        for key in self.black_hashmap.0.iter() {
+            if key_map.contains_key(key) {
+                return false;
+            } else {
+                key_map.insert(key, true);
+            }
+        }
+
+        for key in self.white_kings_hashmap.0.iter() {
+            if key_map.contains_key(key) {
+                return false;
+            } else {
+                key_map.insert(key, true);
+            }
+        }
+
+        for key in self.black_kings_hashmap.0.iter() {
+            if key_map.contains_key(key) {
+                return false;
+            } else {
+                key_map.insert(key, true);
+            }
+        }
+
+        if key_map.contains_key(&self.side_hash) {
+            return false;
+        }
+
+        true
     }
 }
 
