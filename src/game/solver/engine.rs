@@ -7,7 +7,9 @@ use crate::transposition_table::{
     TranspositionTable, TranspositionTableEntry, TranspositionTableFlag,
 };
 
-const CHECK_EVERY_N_NODES: usize = 2_047;
+use crate::game::solver::endgame_table::EndgameTable;
+
+const CHECK_EVERY_N_NODES: usize = 4_096;
 
 #[derive(Debug)]
 pub struct Engine {
@@ -20,6 +22,7 @@ pub struct Engine {
     pub best_score: i32,
     pub searched_nodes: usize,
     transposition_table: TranspositionTable,
+    endgame_lookup_table: EndgameTable,
 }
 
 impl Engine {
@@ -34,6 +37,7 @@ impl Engine {
             best_score: Score::DRAW,
             searched_nodes: 0,
             transposition_table: TranspositionTable::default(),
+            endgame_lookup_table: EndgameTable::default(),
         }
     }
 }
@@ -55,12 +59,20 @@ impl Engine {
 
             self.search_root(game, self.current_depth, -Score::INFINITY, Score::INFINITY);
 
-            let end_time = std::time::Instant::now();
-            let elapsed_time = end_time - self.start_time;
+            let current_time = std::time::Instant::now();
+            let elapsed_time = current_time - self.start_time;
 
             // We might also need to check if the time left is greater than 2* the time it took to
             // search the previous depth
-            if elapsed_time >= self.max_time || self.current_depth >= 32 || self.stopped_searching {
+            if elapsed_time >= self.max_time || self.current_depth >= 64 || self.stopped_searching {
+                // Hard stop
+                break;
+            }
+
+            // let time_left = self.max_time - elapsed_time;
+
+            if self.max_time < elapsed_time {
+                // Soft stop
                 break;
             }
         }
@@ -108,10 +120,26 @@ impl Engine {
             if transposition_table_entry.depth >= depth {
                 match transposition_table_entry.flag {
                     TranspositionTableFlag::Exact => {
-                        self.best_score = transposition_table_entry.score;
-                        self.best_move = Some(transposition_table_entry.best_move_sequence.clone());
+                        // Check if this move is a repetition
+                        // This might unintentionally cause a draw
+                        game.make_move_sequence(&transposition_table_entry.best_move_sequence);
+                        let count_repetitions = game
+                            .move_history_hash
+                            .iter()
+                            .rev()
+                            .filter(|&&hash| hash == game.current_hash)
+                            .count();
 
-                        return transposition_table_entry.score;
+                        game.unmake_move_sequence();
+                        if count_repetitions >= 2 {
+                            // Keep searching
+                        } else {
+                            self.best_score = transposition_table_entry.score;
+                            self.best_move =
+                                Some(transposition_table_entry.best_move_sequence.clone());
+
+                            return transposition_table_entry.score;
+                        }
                     }
                     TranspositionTableFlag::LowerBound => {
                         alpha = alpha.max(transposition_table_entry.score)
@@ -228,7 +256,25 @@ impl Engine {
             if transposition_table_entry.depth >= depth {
                 match transposition_table_entry.flag {
                     TranspositionTableFlag::Exact => {
-                        return transposition_table_entry.score;
+                        // We should first check if this position is a repetition
+                        // so we do not run into a draw
+                        // a draw is bad if we are winning and good if we are losing
+                        // Check if this move is a repetition
+                        // This might unintentionally cause a draw
+                        game.make_move_sequence(&transposition_table_entry.best_move_sequence);
+                        let count_repetitions = game
+                            .move_history_hash
+                            .iter()
+                            .rev()
+                            .filter(|&&hash| hash == game.current_hash)
+                            .count();
+
+                        game.unmake_move_sequence();
+                        if count_repetitions >= 2 {
+                            // Keep searching
+                        } else {
+                            return transposition_table_entry.score;
+                        }
                     }
                     TranspositionTableFlag::LowerBound => {
                         alpha = alpha.max(transposition_table_entry.score)
@@ -409,7 +455,7 @@ impl Engine {
                 - (game.black_kings & Engine::BLACK_KINGS_STRONG).count() as i32);
 
         // // Mobility
-        // // since we're only evaluating quiet moves, we can consider the mobility of sliding pieces
+        // since we're only evaluating quiet moves, we can consider the mobility of sliding pieces
         // match game.side_to_move {
         //     Color::White => {
         //         let (lf, rf, lb, rb) = game.generate_white_slides();
@@ -420,6 +466,36 @@ impl Engine {
         //         score -= (lf | rf | lb | rb).count() as i32;
         //     }
         // }
+
+        // For the endgame table look here http://webdocs.cs.ualberta.ca/~chinook/databases/
+        if (game.white | game.black).count() <= 6 {
+            // Use endgame database,
+            // but only if there are not captures one either side possible
+            let w = game.generate_white_jumps(&Bitboard::ALL);
+            let b = game.generate_black_jumps(&Bitboard::ALL);
+            if (w.0 | w.1 | w.2 | w.3 | b.0 | b.1 | b.2 | b.3).count() == 0 {
+                // Assures there are no captures available
+                // Now we can translate the current position / state into a string
+
+                let position = EndgameTable::state_to_string(
+                    game.black,
+                    game.white,
+                    game.black_kings,
+                    game.white_kings,
+                );
+
+                if let Some(flag) = self.endgame_lookup_table.fetch(position) {
+                    match flag {
+                        EndgameTableFlag::BlackWin => score += -Score::DB_WIN,
+                        EndgameTableFlag::WhiteWin => score += Score::DB_WIN,
+                        EndgameTableFlag::MostlyBlackWin => score += -Score::DB_MOSTLY_WIN_BONUS,
+                        EndgameTableFlag::MostlyWhiteWin => score += Score::DB_MOSTLY_WIN_BONUS,
+                        EndgameTableFlag::Draw => score = (score as f32 * 0.1) as i32,
+                        EndgameTableFlag::MostlyDraw => score = (score as f32 * 0.25) as i32,
+                    };
+                }
+            }
+        }
 
         match game.side_to_move {
             Color::White => {
@@ -511,6 +587,8 @@ impl Engine {
 
 impl Engine {
     pub fn translate_score(score: i32, side_of_view: Color, current_ply: usize) -> String {
+        // Can probably get along wiothout side of view,
+        // match blocks look the same
         match side_of_view {
             Color::Black => {
                 if score > 500_000 {
@@ -521,6 +599,10 @@ impl Engine {
                     // Black is winning and we are black
                     let distance = Score::WIN + score - current_ply as i32;
                     return format!("-- in {}", distance);
+                } else if score > 25_000 {
+                    return "+".to_string();
+                } else if score < -25_000 {
+                    return "-".to_string();
                 }
             }
             Color::White => {
@@ -532,10 +614,18 @@ impl Engine {
                     // Black is winning and we are white
                     let distance = Score::WIN + score - current_ply as i32;
                     return format!("-- in {}", distance);
+                } else if score > 25_000 {
+                    return "+".to_string();
+                } else if score < -25_000 {
+                    return "-".to_string();
                 }
             }
         }
 
-        return format!("{:.2}", score as f32 / 1000.0);
+        return format!(
+            "{}{:.2}",
+            if score >= 0 { "+" } else { "" },
+            score as f32 / 1000.0
+        );
     }
 }

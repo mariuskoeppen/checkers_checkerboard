@@ -23,8 +23,8 @@ pub struct Game {
     pub ply: usize,
     /// Only needed for hashing so we can determine if a position has occured three times (draw).
     transposition_table: TranspositionTable,
-    move_history_hash: Vec<u64>,
-    current_hash: u64,
+    pub move_history_hash: Vec<u64>,
+    pub current_hash: u64,
 }
 
 impl Default for Game {
@@ -98,11 +98,18 @@ impl Game {
             return false;
         }
 
+        let first_irreversible = self
+            .move_history
+            .iter()
+            .rev()
+            .position(|ms| ms.is_irreversible())
+            .expect("No irreversible move found");
+
         if self
             .move_history_hash
             .iter()
             .rev()
-            .take(6)
+            .take(first_irreversible + 1)
             .filter(|&&h| h == self.current_hash)
             .count()
             >= 3
@@ -173,16 +180,16 @@ impl Game {
                 Color::White => "White moves next ",
                 Color::Black => "Black moves next ",
             };
+            let mut e = Engine::new(self.side_to_move.clone(), Duration::from_secs(1));
+            s += &format!(
+                "<{}>",
+                match self.side_to_move {
+                    Color::Black => -e.evaluate(self),
+                    Color::White => e.evaluate(self),
+                }
+            );
         }
 
-        let mut e = Engine::new(self.side_to_move.clone(), Duration::from_secs(1));
-        s += &format!(
-            "<{}>",
-            match self.side_to_move {
-                Color::Black => -e.evaluate(self),
-                Color::White => e.evaluate(self),
-            }
-        );
         s += "\n\n";
 
         for row in 0..8 {

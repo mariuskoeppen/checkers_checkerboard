@@ -1,9 +1,11 @@
 // pub mod dumb;
+pub mod endgame_table;
 pub mod engine;
 pub mod negamax;
 
 // pub use dumb::DumbSolver;
 // pub use negamax::NegamaxSolver;
+pub use endgame_table::*;
 pub use engine::*;
 
 use crate::game::*;
@@ -14,6 +16,8 @@ pub struct Score;
 impl Score {
     pub const INFINITY: i32 = 2_000_000;
     pub const WIN: i32 = 1_000_000;
+    pub const DB_WIN: i32 = 400_000;
+    pub const DB_MOSTLY_WIN_BONUS: i32 = 5_000;
     pub const DRAW: i32 = 0;
 }
 

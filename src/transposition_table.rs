@@ -167,6 +167,7 @@ impl TranspositionTable {
     }
 
     pub fn fetch(&self, key: u64) -> Option<&TranspositionTableEntry> {
+        // return None;
         let index = (key % self.table_size as u64) as usize;
 
         if let Some(entry) = &self.table[index] {

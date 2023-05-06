@@ -17,7 +17,7 @@ async fn main() {
     for _ in 0..9 {
         let mut game = Game::new();
         let mut black_engine = Engine::new(Color::Black, Duration::from_millis(50));
-        let mut white_engine = Engine::new(Color::White, Duration::from_millis(200));
+        let mut white_engine = Engine::new(Color::White, Duration::from_millis(10));
 
         // let (best_move, score, pv) = black_engine.find_best_move(&mut game).await;
         // println!("Best move: {:?} <{}> {} ", best_move, score, pv);
@@ -26,12 +26,13 @@ async fn main() {
             let black_move = black_engine.find_best_move(&mut game).await;
             game.make_move_sequence(&black_move.0.clone().unwrap());
             println!(
-                "B ({}) {:?}",
+                "B <{}> ({}) {}",
+                black_engine.current_depth - 1,
                 Engine::translate_score(black_move.1, Color::Black, game.ply),
                 black_move.2
             );
 
-            // println!("{}", game.to_console_string());
+            println!("{}", game.to_console_string());
 
             if game.is_draw() {
                 println!("Game over! Draw!");
@@ -53,12 +54,13 @@ async fn main() {
             let white_move = white_engine.find_best_move(&mut game).await;
             game.make_move_sequence(&white_move.0.clone().unwrap());
             println!(
-                "W ({}) {:?}",
+                "W <{}> ({}) {}",
+                white_engine.current_depth - 1,
                 Engine::translate_score(white_move.1, Color::White, game.ply),
                 white_move.2
             );
 
-            // println!("{}", game.to_console_string());
+            println!("{}", game.to_console_string());
 
             if game.is_draw() {
                 println!("Game over! Draw!");

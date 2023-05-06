@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
-#[derive(Debug)]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Bitboard(pub u64);
 
 impl Bitboard {
@@ -63,6 +62,9 @@ impl Bitboard {
 impl Bitboard {
     /// All tiles.
     pub const ALL: Bitboard = Bitboard(0x1FEFF7FBFC00);
+
+    pub const SINGLE: Bitboard = Bitboard(1);
+
     /// Row 1
     pub const ONE: Bitboard = Bitboard(0x1E0000000000);
     /// Row 2
@@ -113,11 +115,53 @@ impl Bitboard {
     pub const WHITE_SIDE: Bitboard = Bitboard(0x1FEF00000000);
 }
 
-impl Bitboard {}
+impl Bitboard {
+    pub fn to_rank(&self) -> usize {
+        if *self & Self::ONE >= Self::SINGLE {
+            0
+        } else if *self & Self::TWO >= Self::SINGLE {
+            1
+        } else if *self & Self::THREE >= Self::SINGLE {
+            2
+        } else if *self & Self::FOUR >= Self::SINGLE {
+            3
+        } else if *self & Self::FIVE >= Self::SINGLE {
+            4
+        } else if *self & Self::SIX >= Self::SINGLE {
+            5
+        } else if *self & Self::SEVEN >= Self::SINGLE {
+            6
+        } else if *self & Self::EIGHT >= Self::SINGLE {
+            7
+        } else {
+            panic!("{:X} is out of bounds", self);
+        }
+    }
+
+    pub fn to_db_rank(&self) -> usize {
+        if *self & Self::ONE >= Self::SINGLE {
+            7
+        } else if *self & Self::TWO >= Self::SINGLE {
+            6
+        } else if *self & Self::THREE >= Self::SINGLE {
+            5
+        } else if *self & Self::FOUR >= Self::SINGLE {
+            4
+        } else if *self & Self::FIVE >= Self::SINGLE {
+            3
+        } else if *self & Self::SIX >= Self::SINGLE {
+            2
+        } else if *self & Self::SEVEN >= Self::SINGLE {
+            1
+        } else if *self & Self::EIGHT >= Self::SINGLE {
+            0
+        } else {
+            panic!("{:X} is out of bounds", self);
+        }
+    }
+}
 
 // region: std Bitboard implentations
-
-
 
 impl AsMut<u64> for Bitboard {
     fn as_mut(&mut self) -> &mut u64 {
